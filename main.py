@@ -3,21 +3,92 @@ from tkinter import ttk
 
 root = tk.Tk()
 root.geometry("1200x650")
-root.minsize(1100, 650)
+root.minsize(1150, 650)
 root.title("Dormi Admin Panel")
 
 font_color_sidebar = "white"
 sidebar_color = "#0f1b3d"
 active_color = "#2e3a6e"
-content_color = "#c7bfbf"
+content_color = "#eceaea"
 
 UNIFORM_FONT = ("Segoe UI", 10)
 
 # ── Page content functions ──────────────────────────────
 def build_dashboard_page(page):
-    tk.Label(page, text="Dashboard Page", bg=content_color, fg=font_color_sidebar,
-             font=("Arial", 16, "bold")).pack(pady=20)
-    tk.Button(page, text="test button for dashboard", bg="#446ad2", fg="white").pack(anchor="w", pady=10, padx=20)
+    tk.Label(page, text="Dashboard", bg=content_color, fg="black",
+             font=("Arial", 16, "bold")).pack(anchor="w", pady=20, padx=20)
+
+    # --- Cards row container ---
+    cards_frame = tk.Frame(page, bg=content_color)
+    cards_frame.pack(fill="x", padx=30, pady=10)
+
+    totalstudents_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+    totalstudents_Lframe.pack(side="left", padx=(0, 10), fill="x", expand=True)
+    totalstudents_Lframe.pack_propagate(False)
+    tk.Label(totalstudents_Lframe, text="🧑", font=("Arial", 24), bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
+    tsNum = tk.Label(totalstudents_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
+    tsNum.pack(anchor="w", padx=10, pady=5)
+    tk.Label(totalstudents_Lframe, text="Total students", font=("Arial", 15), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
+
+    totalrooms_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+    totalrooms_Lframe.pack(side="left", padx=10, fill="x", expand=True)
+    totalrooms_Lframe.pack_propagate(False)
+    tk.Label(totalrooms_Lframe, text="🛏️", font=("Arial", 24), bg="white", fg="Green").pack(anchor="w", padx=10, pady=5)
+    trNum = tk.Label(totalrooms_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
+    trNum.pack(anchor="w", padx=10, pady=5)
+    tk.Label(totalrooms_Lframe, text="Total rooms", font=("Arial", 15), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
+
+    totalroomsoccupied_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+    totalroomsoccupied_Lframe.pack(side="left", padx=10, fill="x", expand=True)
+    totalroomsoccupied_Lframe.pack_propagate(False)
+    tk.Label(totalroomsoccupied_Lframe, text="🛏️", font=("Arial", 24), bg="white", fg="violet").pack(anchor="w", padx=10, pady=5)
+    troNum = tk.Label(totalroomsoccupied_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
+    troNum.pack(anchor="w", padx=10, pady=5)
+    tk.Label(totalroomsoccupied_Lframe, text="Rooms occupied", font=("Arial", 15), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
+
+    totalcleaning_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+    totalcleaning_Lframe.pack(side="left", padx=(10, 0), fill="x", expand=True)
+    totalcleaning_Lframe.pack_propagate(False)
+    tk.Label(totalcleaning_Lframe, text="🧹", font=("Arial", 24), bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
+    tcNum = tk.Label(totalcleaning_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
+    tcNum.pack(anchor="w", padx=10, pady=5)
+    tk.Label(totalcleaning_Lframe, text="Cleaning tasks", font=("Arial", 15), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
+
+    #start of Treeview for student assignments and cleaning assignments    
+
+    tk.Label(page, text="Recent student assignments", bg=content_color,font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
+
+    treeStuAss = ttk.Treeview(page, columns=("Student", "Room", "Start Date", "Status"), show="headings")
+
+    treeStuAss.heading("Student", text="Student Name")
+    treeStuAss.heading("Room",   text="Room")
+    treeStuAss.heading("Start Date", text="Start Date")
+    treeStuAss.heading("Status", text="Status")
+
+    treeStuAss.column("Student",width=150)
+    treeStuAss.column("Room",width=50)
+    treeStuAss.column("Start Date",width=75)
+    treeStuAss.column("Status", width=75)
+
+    treeStuAss.pack(fill="both",padx=(20, 20), pady=10)
+
+    tk.Label(page, text="Cleaning assignments today", bg=content_color,font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
+
+    treeCleanAss = ttk.Treeview(page, columns=("ID", "StaffName", "Room", "TimeStart", "TimeEnd"), show="headings")
+
+    treeCleanAss.heading("ID", text="ID")
+    treeCleanAss.heading("StaffName", text="Staff Name")
+    treeCleanAss.heading("Room", text="Room")
+    treeCleanAss.heading("TimeStart", text="Time Start")
+    treeCleanAss.heading("TimeEnd", text="Time End")
+  
+    treeCleanAss.column("ID",width=50)
+    treeCleanAss.column("StaffName",width=150)
+    treeCleanAss.column("Room",width=50)
+    treeCleanAss.column("TimeStart",width=75)
+    treeCleanAss.column("TimeEnd", width=75)
+
+    treeCleanAss.pack(fill="both",padx=(20,20), pady=10)
 
 def build_students_page(page):
     WHITE      = "#ffffff"
@@ -144,7 +215,7 @@ def build_students_page(page):
 
 
 def build_rooms_page(page):
-    tk.Label(page, text="Rooms Page", bg=content_color, fg=font_color_sidebar,
+    tk.Label(page, text="Rooms", bg=content_color, fg=font_color_sidebar,
              font=("Arial", 16, "bold")).pack(pady=20)
 
 def build_cleaning_page(page):
@@ -152,7 +223,7 @@ def build_cleaning_page(page):
              font=("Arial", 16, "bold")).pack(pady=20)
 
 # Sidebar
-sidebar = tk.Frame(root, bg=sidebar_color, width=200)
+sidebar = tk.Frame(root, bg=sidebar_color, width=300)
 sidebar.pack(side="left", fill="y")
 sidebar.pack_propagate(False)
 
