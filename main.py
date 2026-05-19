@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 
 root = tk.Tk()
 root.geometry("1200x650")
@@ -10,6 +11,8 @@ sidebar_color = "#0f1b3d"
 active_color = "#2e3a6e"
 content_color = "#c7bfbf"
 
+UNIFORM_FONT = ("Segoe UI", 10)
+
 # ── Page content functions ──────────────────────────────
 def build_dashboard_page(page):
     tk.Label(page, text="Dashboard Page", bg=content_color, fg=font_color_sidebar,
@@ -17,19 +20,136 @@ def build_dashboard_page(page):
     tk.Button(page, text="test button for dashboard", bg="#446ad2", fg="white").pack(anchor="w", pady=10, padx=20)
 
 def build_students_page(page):
-    tk.Label(page, text="Students Page", bg=content_color, fg=font_color_sidebar,
-             font=("Arial", 16, "bold")).pack(pady=20)
-    # add more student widgets here...
+    WHITE      = "#ffffff"
+    HEADER_BG  = "#eae8f0"
+    ROW_ALT    = "#f7f6fb"
+    ROW_SEL    = "#dcd8f0"
+    BORDER     = "#dde0ee"
+    FG_DARK    = "#1a1a2e"
+    FG_MUTED   = "#9aa3c2"
+
+    # ── Top bar ─────────────────────────────────────────
+    topbar = tk.Frame(page, bg=content_color)
+    topbar.pack(fill="x", padx=28, pady=(20, 12))
+
+    tk.Label(topbar, text="Students", bg=content_color, fg=FG_DARK,
+             font=("Segoe UI", 17, "bold")).pack(side="left")
+
+    tk.Label(topbar, text="⋯", bg=content_color, fg=FG_DARK,
+             font=("Segoe UI", 13)).pack(side="right", padx=(6, 0))
+
+    tk.Button(topbar, text="+ Add student", bg=WHITE, fg=FG_DARK,
+              font=UNIFORM_FONT, relief="solid", bd=1,
+              padx=12, pady=5, cursor="hand2").pack(side="right")
+
+    # ── Card ────────────────────────────────────────────
+    card = tk.Frame(page, bg=WHITE,
+                    highlightbackground=BORDER, highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
+
+    # ── Search bar ──────────────────────────────────────
+    search_wrap = tk.Frame(card, bg=WHITE,
+                           highlightbackground=BORDER, highlightthickness=1)
+    search_wrap.pack(fill="x", padx=16, pady=(14, 10))
+
+    tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
+             font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+
+    search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+                            font=UNIFORM_FONT, relief="flat", bd=0,
+                            insertbackground=FG_DARK)
+    search_entry.insert(0, "Search by name or student number...")
+    search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+    # ── Treeview style ───────────────────────────────────
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    style.configure("Students.Treeview",
+                    background=WHITE,
+                    foreground=FG_DARK,
+                    rowheight=36,
+                    fieldbackground=WHITE,
+                    borderwidth=0,
+                    font=UNIFORM_FONT)
+
+    style.configure("Students.Treeview.Heading",
+                    background=HEADER_BG,
+                    foreground="#555577",
+                    font=("Segoe UI", 9, "bold"),
+                    relief="flat",
+                    padding=(8, 6))
+
+    style.map("Students.Treeview",
+              background=[("selected", ROW_SEL)],
+              foreground=[("selected", FG_DARK)])
+
+    style.layout("Students.Treeview", [
+        ("Treeview.treearea", {"sticky": "nswe"})
+    ])
+
+    # ── Treeview ─────────────────────────────────────────
+    columns = ("student_no", "name", "program", "room", "status", "contact")
+
+    tree_frame = tk.Frame(card, bg=WHITE)
+    tree_frame.pack(fill="both", expand=True, padx=16)
+
+    tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                        style="Students.Treeview", selectmode="browse")
+
+    col_cfg = [
+        ("student_no", "Student no.", 120, "w"),
+        ("name",       "Name",        190, "w"),
+        ("program",    "Program",      85, "center"),
+        ("room",       "Room",         70, "center"),
+        ("status",     "Status",       95, "center"),
+        ("contact",    "Contact",     120, "w"),
+    ]
+    for cid, heading, width, anchor in col_cfg:
+        tree.heading(cid, text=heading, anchor=anchor)
+        tree.column(cid,  width=width,  anchor=anchor, stretch=True)
+
+
+
+    scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    tree.pack(side="left", fill="both", expand=True)
+
+    # ── Separator ────────────────────────────────────────
+    tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(6, 0))
+
+    # ── Action bar ───────────────────────────────────────
+    action_bar = tk.Frame(card, bg=WHITE)
+    action_bar.pack(fill="x", padx=16, pady=10)
+
+    tk.Label(action_bar, text="5 students", bg=WHITE, fg=FG_MUTED,
+             font=UNIFORM_FONT).pack(side="left", padx=(4, 0))
+
+    btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+                   relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+
+    tk.Button(action_bar, text="✏  Edit",         **btn_cfg).pack(side="right", padx=4)
+    tk.Button(action_bar, text="⊞  Assign room",  **btn_cfg).pack(side="right", padx=4)
+    tk.Button(action_bar, text="🗑  Delete",
+              bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
+              relief="solid", bd=1, padx=14, pady=5,
+              cursor="hand2").pack(side="right", padx=4)
+
+    # ── Hint ─────────────────────────────────────────────
+    tk.Label(card,
+             text="ⓘ  Click a row to select before editing, assigning, or deleting.",
+             bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8),
+             anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+
 
 def build_rooms_page(page):
     tk.Label(page, text="Rooms Page", bg=content_color, fg=font_color_sidebar,
              font=("Arial", 16, "bold")).pack(pady=20)
-    # add more room widgets here...
 
 def build_cleaning_page(page):
     tk.Label(page, text="Cleaning Staff Page", bg=content_color, fg=font_color_sidebar,
              font=("Arial", 16, "bold")).pack(pady=20)
-    # add more cleaning staff widgets here...
 
 # Sidebar
 sidebar = tk.Frame(root, bg=sidebar_color, width=200)
@@ -51,22 +171,19 @@ students_page  = tk.Frame(content, bg=content_color)
 rooms_page     = tk.Frame(content, bg=content_color)
 cleaning_page  = tk.Frame(content, bg=content_color)
 
-# Build all pages
 build_dashboard_page(dashboard_page)
 build_students_page(students_page)
 build_rooms_page(rooms_page)
 build_cleaning_page(cleaning_page)
 
-
 # ── Show page function ──────────────────────────────────
-all_pages = [dashboard_page, students_page, rooms_page, cleaning_page]
+all_pages   = [dashboard_page, students_page, rooms_page, cleaning_page]
 all_buttons = []
 
 def show_page(page, active_btn):
     for p in all_pages:
         p.pack_forget()
     for btn in all_buttons:
-
         btn.config(bg=sidebar_color)
     page.pack(fill="both", expand=True)
     active_btn.config(bg=active_color)
