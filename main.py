@@ -408,6 +408,9 @@ def main():
         seperator.pack(fill="x", padx=16, pady=(6, 0))
         btnFrame.pack(fill="x", padx=16, pady=10)
         instrucLabel.pack(fill="x", padx=20, pady=(0, 10))
+    def build_cleaning_page(page):
+        tk.Label(page, text="Cleaning Staff Page", bg=content_color, fg=font_color_sidebar,
+                 font=("Arial", 16, "bold")).pack(pady=20)
     
     # Sidebar
     sidebar = tk.Frame(root, bg=sidebar_color, width=300)
