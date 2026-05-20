@@ -56,7 +56,7 @@ def login_page():
       password_entry.pack(fill=X, ipady=8, pady=(4, 28))
 
       # Button
-      btn = Button(right, text="Sign In", font=("Arial", 11, "bold"),
+      btn = Button(right, text="Login", font=("Arial", 11, "bold"),
                   bg="#000000", fg="#ffffff",
                   activebackground="#c3c3c3", activeforeground="#ffffff",
                   relief=FLAT, bd=0, cursor="hand2")
