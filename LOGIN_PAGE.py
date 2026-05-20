@@ -18,7 +18,7 @@ def login_page():
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("main files/Dormi.png")
+      img_raw = Image.open("Dormi.png")
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
