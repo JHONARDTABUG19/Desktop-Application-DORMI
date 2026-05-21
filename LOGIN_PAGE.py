@@ -1,6 +1,6 @@
 from tkinter import *
 from PIL import Image, ImageTk
-from MainField import main
+from main import main
 import sqlite3
 
 def login_page():
