@@ -4,21 +4,21 @@ from main import main
 import sqlite3
 
 def login_page():
-      background = "#dafff1"
+      background_outside_frame = "#D6EFFF"
+      background = "#F3E4C9"
       background_inside_frame = "#ffffff"
 
       root = Tk()
       root.title("Dormi Management System")
       root.geometry("1000x600")
-      root.resizable(False, False)
-      root.configure(bg=background)
+      root.configure(bg=background_outside_frame)
 
       # ── Center frame ──────────────────────────────────────────────
-      frame = LabelFrame(root, bg=background, bd=0)
+      frame = LabelFrame(root, bg=background, highlightbackground="black", highlightthickness=2)
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("Dormi.png")
+      img_raw = Image.open("main files/Dormi.png")
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
@@ -56,8 +56,8 @@ def login_page():
       password_entry.pack(fill=X, ipady=8, pady=(4, 28))
 
       # Button
-      btn = Button(right, text="Login", font=("Arial", 11, "bold"),
-                  bg="#000000", fg="#ffffff",
+      btn = Button(right, text="Log In", font=("Arial", 11, "bold"),
+                  bg="#A77F60", fg="#ffffff",
                   activebackground="#c3c3c3", activeforeground="#ffffff",
                   relief=FLAT, bd=0, cursor="hand2")
       btn.pack(fill=X, ipady=10)
