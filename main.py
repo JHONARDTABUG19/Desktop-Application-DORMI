@@ -377,7 +377,7 @@ def main(login_root=None):
         upperFrame = tk.Frame(page, bg=content_color)
         cleaningStaffLabel = tk.Label(upperFrame, text="Cleaning Staff",bg=content_color, fg=FG_DARK,
             font=("Segoe UI", 17, "bold")).pack(side="left")
-        addStaffBtn = tk.Button(upperFrame, text="+ Add student", bg=WHITE, fg=FG_DARK,
+        addStaffBtn = tk.Button(upperFrame, text="+ Add Staff", bg=WHITE, fg=FG_DARK,
                 font=UNIFORM_FONT, relief="solid", bd=1,
                 padx=12, pady=5, cursor="hand2").pack(side="right")
         
