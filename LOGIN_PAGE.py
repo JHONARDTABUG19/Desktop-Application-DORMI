@@ -18,7 +18,7 @@ def login_page():
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("main files/Dormi.png")
+      img_raw = Image.open("Dormi.png")
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
@@ -62,10 +62,9 @@ def login_page():
                   relief=FLAT, bd=0, cursor="hand2")
       btn.pack(fill=X, ipady=10)
 
-      btn.bind("<Button-1>", lambda event: main())
+      btn.bind("<Button-1>", lambda event: main(root))
 
       root.mainloop()
 
 login_page()
-
 
