@@ -14,26 +14,16 @@ FG_DARK    = "#1a1a2e"
 FG_MUTED   = "#9aa3c2"
 
 font_color_sidebar = "white"
-sidebar_color = "#0f1b3d"
-active_color = "#2e3a6e"
-content_color = "#c7bfbf"
+sidebar_color = "#8A5F41"
+active_color = "#A77F60"
+content_color = "#F3E4C9"
 black = "#070707"
 
 def main():
-    import tkinter as tk
-    from tkinter import ttk
-    
     root = tk.Tk()
     root.geometry("1200x650")
     root.minsize(1150, 650)
     root.title("Dormi Admin Panel")
-    
-    font_color_sidebar = "white"
-    sidebar_color = "#0f1b3d"
-    active_color = "#2e3a6e"
-    content_color = "#eceaea"
-    
-    UNIFORM_FONT = ("Segoe UI", 10)
     
     # ── Page content functions ──────────────────────────────
     def build_dashboard_page(page):
@@ -47,6 +37,7 @@ def main():
         totalstudents_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalstudents_Lframe.pack(side="left", padx=(0, 10), fill="x", expand=True)
         totalstudents_Lframe.pack_propagate(False)
+
         tk.Label(totalstudents_Lframe, text="🧑", font=("Arial", 24), bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
         tsNum = tk.Label(totalstudents_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
         tsNum.pack(anchor="w", padx=10, pady=5)
@@ -55,6 +46,7 @@ def main():
         totalrooms_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalrooms_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalrooms_Lframe.pack_propagate(False)
+
         tk.Label(totalrooms_Lframe, text="🛏️", font=("Arial", 24), bg="white", fg="Green").pack(anchor="w", padx=10, pady=5)
         trNum = tk.Label(totalrooms_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
         trNum.pack(anchor="w", padx=10, pady=5)
@@ -63,6 +55,7 @@ def main():
         totalroomsoccupied_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalroomsoccupied_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalroomsoccupied_Lframe.pack_propagate(False)
+
         tk.Label(totalroomsoccupied_Lframe, text="🛏️", font=("Arial", 24), bg="white", fg="violet").pack(anchor="w", padx=10, pady=5)
         troNum = tk.Label(totalroomsoccupied_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
         troNum.pack(anchor="w", padx=10, pady=5)
@@ -71,6 +64,7 @@ def main():
         totalcleaning_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalcleaning_Lframe.pack(side="left", padx=(10, 0), fill="x", expand=True)
         totalcleaning_Lframe.pack_propagate(False)
+
         tk.Label(totalcleaning_Lframe, text="🧹", font=("Arial", 24), bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
         tcNum = tk.Label(totalcleaning_Lframe, text="0", font=("Arial", 24, "bold"), bg="white", fg="black")
         tcNum.pack(anchor="w", padx=10, pady=5)
@@ -78,7 +72,7 @@ def main():
     
         #start of Treeview for student assignments and cleaning assignments    
     
-        tk.Label(page, text="Recent student assignments", bg=content_color,font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
+        tk.Label(page, text="Recent student assignments", bg=content_color, font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
     
         treeStuAss = ttk.Treeview(page, columns=("Student", "Room", "Start Date", "Status"), show="headings")
     
@@ -113,14 +107,7 @@ def main():
         treeCleanAss.pack(fill="both",padx=(20,20), pady=10)
     
     def build_students_page(page):
-        WHITE      = "#ffffff"
-        HEADER_BG  = "#eae8f0"
-        ROW_ALT    = "#f7f6fb"
-        ROW_SEL    = "#dcd8f0"
-        BORDER     = "#dde0ee"
-        FG_DARK    = "#1a1a2e"
-        FG_MUTED   = "#9aa3c2"
-    
+        
         # ── Top bar ─────────────────────────────────────────
         topbar = tk.Frame(page, bg=content_color)
         topbar.pack(fill="x", padx=28, pady=(20, 12))
@@ -391,9 +378,9 @@ def main():
         tk.Button(btnFrame, text="✏  Edit",         **btn_cfg).pack(side="right", padx=4)
         tk.Button(btnFrame, text="⊞  Assign Cleaning",command=CSassign_window,  **btn_cfg).pack(side="right", padx=4)
         tk.Button(btnFrame, text="🗑  Delete",
-                bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                relief="solid", bd=1, padx=14, pady=5,
-                cursor="hand2").pack(side="right", padx=4)
+                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
+                  relief="solid", bd=1, padx=14, pady=5,
+                  cursor="hand2").pack(side="right", padx=4)
         
         instrucLabel =  tk.Label(card,
             text="ⓘ  Click a row to select before editing, assigning, or deleting.",
@@ -408,8 +395,14 @@ def main():
         seperator.pack(fill="x", padx=16, pady=(6, 0))
         btnFrame.pack(fill="x", padx=16, pady=10)
         instrucLabel.pack(fill="x", padx=20, pady=(0, 10))
+    
+    def build_settings_page(page):
+        tk.Label(page, text="FOR LOG OUT AND USER MANAGEMENT", bg=content_color, fg=font_color_sidebar,
+                 font=("Arial", 16, "bold")).pack(pady=20)
+
+
         
-    # Sidebar
+    # Main Sidebar
     sidebar = tk.Frame(root, bg=sidebar_color, width=300)
     sidebar.pack(side="left", fill="y")
     sidebar.pack_propagate(False)
@@ -428,14 +421,16 @@ def main():
     students_page  = tk.Frame(content, bg=content_color)
     rooms_page     = tk.Frame(content, bg=content_color)
     cleaning_page  = tk.Frame(content, bg=content_color)
-    
+    settings_page  = tk.Frame(content, bg=content_color)
+    #Distinct Content for each page
     build_dashboard_page(dashboard_page)
     build_students_page(students_page)
     build_rooms_page(rooms_page)
     build_cleaning_page(cleaning_page)
+    build_settings_page(settings_page)
     
     # ── Show page function ──────────────────────────────────
-    all_pages   = [dashboard_page, students_page, rooms_page, cleaning_page]
+    all_pages   = [dashboard_page, students_page, rooms_page, cleaning_page, settings_page]
     all_buttons = []
     
     def show_page(page, active_btn):
@@ -472,13 +467,22 @@ def main():
                                font=("Arial", 10), relief="flat", anchor="w",
                                padx=10, pady=8, cursor="hand2")
     cleaningButton.pack(fill="x", padx=10, pady=2)
+
+    Settings = tk.Button(sidebar, text="  Settings", bg=sidebar_color, fg=font_color_sidebar,
+                               font=("Arial", 10), relief="flat", anchor="w",
+                               padx=10, pady=8, cursor="hand2")
+    Settings.pack(fill="x", padx=10, pady=2)
     
-    all_buttons.extend([dashboardButton, studentButton, roomsButton, cleaningButton])
+    # Extend all_buttons list
+    all_buttons.extend([dashboardButton, studentButton, roomsButton, cleaningButton, Settings])
     
+
+    #Buttons Logic
     dashboardButton.config(command=lambda: show_page(dashboard_page, dashboardButton))
     studentButton.config(command=lambda: show_page(students_page, studentButton))
     roomsButton.config(command=lambda: show_page(rooms_page, roomsButton))
     cleaningButton.config(command=lambda: show_page(cleaning_page, cleaningButton))
+    Settings.config(command=lambda: show_page(settings_page, Settings))
     
     show_page(dashboard_page, dashboardButton)
     
