@@ -449,11 +449,11 @@ def main(login_root=None):
 
         # Sample data — name stored as "Surname, Firstname M."
         sample_students = [
-            ("2021-0001", "dela Cruz, Juan D.",   "BSCS",  "101", "Active",   "09171234567"),
-            ("2021-0002", "Santos, Maria A.",      "BSIT",  "102", "Active",   "09181234567"),
-            ("2021-0003", "Reyes, Jose P.",        "BSECE", "103", "On Leave", "09191234567"),
-            ("2021-0004", "Garcia, Ana R.",        "BSCS",  "104", "Active",   "09201234567"),
-            ("2021-0005", "Villanueva, Pedro S.",  "BSIT",  "",    "Inactive", "09211234567"),
+            ("2021-0001", "Pogi, Wendell.",   "BSCS",  "101", "Active",   "09171234567"),
+            ("2021-0002", "Tabug, Jhonard",      "BSIT",  "102", "Active",   "09181234567"),
+            ("2021-0003", "Garciu, Kerby",        "BSECE", "103", "On Leave", "09191234567"),
+            ("2021-0004", "Resuello, Pharell.",        "BSCS",  "104", "Active",   "09201234567"),
+            ("2021-0005", "Cadavis, John Carlo",  "BSIT",  "",    "Inactive", "09211234567"),
         ]
         for row in sample_students:
             tree.insert("", "end", values=row)
