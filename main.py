@@ -19,7 +19,9 @@ active_color = "#A77F60"
 content_color = "#F3E4C9"
 black = "#070707"
 
-def main():
+def main(login_root=None):
+    if login_root:
+        login_root.withdraw()
     root = tk.Tk()
     root.geometry("1200x650")
     root.minsize(1150, 650)
@@ -107,7 +109,83 @@ def main():
         treeCleanAss.pack(fill="both",padx=(20,20), pady=10)
     
     def build_students_page(page):
-        
+
+        # ── Add Student window ────────────────────────────────
+        def add_student_window():
+            win = Toplevel()
+            win.title("Add Student")
+            win.config(bg=content_color)
+            win.geometry("440x420")
+            win.resizable(False, False)
+
+            titleFrame = tk.Frame(win, bg=content_color)
+            titleFrame.pack(fill="x", padx=15, pady=12)
+            tk.Label(titleFrame, text="Add Student", bg=content_color, fg=FG_DARK,
+                     font=("Segoe UI", 15, "bold")).pack(side="left")
+
+            formCard = tk.Frame(win, bg=WHITE, padx=15, pady=15,
+                                bd=1, relief="solid", highlightbackground=BORDER)
+            formCard.pack(fill="both", expand=True, padx=15, pady=5)
+            formCard.columnconfigure(0, weight=1)
+            formCard.columnconfigure(1, weight=1)
+
+            def make_entry(parent, label, row, col, colspan=1):
+                tk.Label(parent, text=label, bg=WHITE, fg=FG_DARK,
+                         font=UNIFORM_FONT).grid(row=row, column=col, columnspan=colspan,
+                                                  sticky="w", pady=(0, 2))
+                border = tk.Frame(parent, bg=WHITE,
+                                  highlightbackground=BORDER, highlightthickness=1)
+                border.grid(row=row + 1, column=col, columnspan=colspan,
+                            sticky="we", pady=(0, 12),
+                            padx=(0, 8) if colspan == 1 and col == 0 else (8, 0) if col == 1 else 0)
+                entry = tk.Entry(border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                 relief="flat", bd=0, insertbackground=FG_DARK)
+                entry.pack(fill="x", padx=5, pady=3)
+                return entry
+
+            def make_combo(parent, label, row, col, options, colspan=1):
+                tk.Label(parent, text=label, bg=WHITE, fg=FG_DARK,
+                         font=UNIFORM_FONT).grid(row=row, column=col, columnspan=colspan,
+                                                  sticky="w", pady=(0, 2))
+                var = tk.StringVar()
+                combo = ttk.Combobox(parent, textvariable=var, values=options,
+                                     state="readonly", font=UNIFORM_FONT)
+                combo.grid(row=row + 1, column=col, columnspan=colspan,
+                           sticky="we", pady=(0, 12),
+                           padx=(0, 8) if col == 0 and colspan == 1 else (8, 0) if col == 1 else 0)
+                combo.current(0)
+                return var
+
+            studentno_entry = make_entry(formCard, "Student No.", row=0, col=0, colspan=2)
+            name_entry      = make_entry(formCard, "Full Name",   row=2, col=0, colspan=2)
+            program_var     = make_combo(formCard, "Program",     row=4, col=0,
+                                         options=["BSIT", "BSCS", "BSN", "BSED", "BSBA"])
+            status_var      = make_combo(formCard, "Status",      row=4, col=1,
+                                         options=["Active", "Upcoming", "No room"])
+            room_entry      = make_entry(formCard, "Room",        row=6, col=0)
+            contact_entry   = make_entry(formCard, "Contact",     row=6, col=1)
+
+            bottomFrame = tk.Frame(win, bg=content_color)
+            bottomFrame.pack(fill="x", padx=15, pady=12)
+
+            def save_student():
+                values = (
+                    studentno_entry.get(),
+                    name_entry.get(),
+                    program_var.get(),
+                    room_entry.get(),
+                    status_var.get(),
+                    contact_entry.get(),
+                )
+                tree.insert("", "end", values=values)
+                win.destroy()
+
+            cancelBtn = tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT)
+            cancelBtn.pack(side="right", padx=(5, 0))
+            saveBtn = tk.Button(bottomFrame, text="Save Student", font=UNIFORM_FONT,
+                                command=save_student)
+            saveBtn.pack(side="right")
+
         # ── Top bar ─────────────────────────────────────────
         topbar = tk.Frame(page, bg=content_color)
         topbar.pack(fill="x", padx=28, pady=(20, 12))
@@ -120,7 +198,8 @@ def main():
     
         tk.Button(topbar, text="+ Add student", bg=WHITE, fg=FG_DARK,
                   font=UNIFORM_FONT, relief="solid", bd=1,
-                  padx=12, pady=5, cursor="hand2").pack(side="right")
+                  padx=12, pady=5, cursor="hand2",
+                  command=add_student_window).pack(side="right")
     
         # ── Card ────────────────────────────────────────────
         card = tk.Frame(page, bg=WHITE,
@@ -292,8 +371,6 @@ def main():
         cancelBtn = tk.Button(bottomFrame, text="Cancel",fg="#c0392b", font=UNIFORM_FONT)
         cancelBtn.pack(side="right")
 
-        assign.mainloop()
-
 
     def build_cleaning_page(page):
         #Label
@@ -355,7 +432,6 @@ def main():
         tree.column("CS_CONTACT", width=300)
         tree.column("CS_EMAIL", width=300)
 
-        #Line below is for selecting record, will be used later
         #tree.bind("<ButtonRelease-1>", select_record)
 
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
@@ -487,3 +563,5 @@ def main():
     show_page(dashboard_page, dashboardButton)
     
     root.mainloop()
+    if login_root:
+        login_root.destroy()
