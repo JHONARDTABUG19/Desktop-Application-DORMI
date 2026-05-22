@@ -1,6 +1,8 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import *
+from tkinter import messagebox
+import sqlite3
 
 UNIFORM_FONT = ("Segoe UI", 10)
 
@@ -18,6 +20,8 @@ sidebar_color = "#8A5F41"
 active_color  = "#A77F60"
 content_color = "#F3E4C9"
 black = "#070707"
+
+DB_NAME = "dorm_management.db"
 
 def main():
     root = tk.Tk()
@@ -726,35 +730,68 @@ def main():
                  anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
 
-
-    def addCleaningStaff():
+# cleaning staff area-------------------------------------------------------------
+    def addCleaningStaff(tree):
         addStaff = Toplevel()
         addStaff.title("Add Cleaning Staff")
         addStaff.config(bg=content_color)
         addStaff.geometry("500x360") 
         addStaff.resizable(False, False) 
 
-        # Upper Frame
+        #logic for adding staff to database and treeview
+        def save_staff():
+            cs_ID  = idEntry.get().strip()
+            last   = LN_Entry.get().strip()
+            first  = FN_Entry.get().strip()
+            mi     = MI_Entry.get().strip()
+            email  = emailEntry.get().strip()
+            contact = contactEntry.get().strip()
+            full_name = f"{last}, {first} {mi}".strip()
+
+            if not cs_ID or not last or not first or not email or not contact:
+                messagebox.showerror("Error", "Please fill in all required fields.")
+                return
+
+            with sqlite3.connect(DB_NAME) as conn:  # 👈 auto closes and commits
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO cleaningStaff (cs_ID, last_name, first_name, middle_initial, email, contact, full_name) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (cs_ID, last, first, mi, email, contact, full_name)
+                )
+            add_staff_treeview()
+            addStaff.destroy()
+
+        def add_staff_treeview():
+            for row in tree.get_children():
+                tree.delete(row)
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                cursor.execute(""" SELECT cs_ID, full_name, contact, email FROM cleaningStaff """)
+                
+            for row in cursor.fetchall():
+                tree.insert("", "end", values=row)
+
+    # Upper Frame
         upperFrame = tk.Frame(addStaff, bg=content_color)
         upperFrame.pack(fill="x", padx=15, pady=12)
-        
-        tk.Label(upperFrame, text="Add Cleaning Staff", bg=content_color, fg=FG_DARK, 
+
+        tk.Label(upperFrame, text="Add Cleaning Staff", bg=content_color, fg=FG_DARK,
                 font=("Segoe UI", 15, "bold")).pack(side="left")
 
         # Mid Frame
         midFrame = tk.Frame(addStaff, bg=WHITE, padx=15, pady=15, bd=1, relief="solid", highlightbackground=BORDER)
         midFrame.pack(fill="x", padx=15, pady=5)
 
-        midFrame.columnconfigure(0, weight=2)  
-        midFrame.columnconfigure(1, weight=2)  
-        midFrame.columnconfigure(2, weight=0)  
+        midFrame.columnconfigure(0, weight=2)
+        midFrame.columnconfigure(1, weight=2)
+        midFrame.columnconfigure(2, weight=0)
 
-        # ROW 1: Cleaning Staff ID 
+        # ROW 1: Cleaning Staff ID
         tk.Label(midFrame, text="Cleaning Staff ID", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
-        
+
         idFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         idFrame.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 15))
-        
+
         idEntry = tk.Entry(idFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
         idEntry.pack(fill="x", padx=5, pady=4)
 
@@ -767,49 +804,55 @@ def main():
         LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
         LN_Entry.pack(fill="x", padx=5, pady=4)
 
-        # First Name (Middle)
         fnGroup = tk.Frame(midFrame, bg=WHITE)
         fnGroup.grid(row=2, column=1, sticky="we", padx=6, pady=(0, 15))
-
         tk.Label(fnGroup, text="First Name", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
         fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         fnBorder.pack(fill="x")
-
         FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
         FN_Entry.pack(fill="x", padx=5, pady=4)
 
-        #Middle Name
         miGroup = tk.Frame(midFrame, bg=WHITE)
         miGroup.grid(row=2, column=2, sticky="w", padx=(6, 0), pady=(0, 15))
-
         tk.Label(miGroup, text="M.I.", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
         miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         miBorder.pack()
-
         MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK, width=3)
         MI_Entry.pack(padx=5, pady=4)
 
-        # ROW 3: Email
-        tk.Label(midFrame, text="Email", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=3, column=0, columnspan=3, sticky="w", pady=(0, 2))
-        
-        emailFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        emailFrame.grid(row=4, column=0, columnspan=3, sticky="we", pady=(0, 5))
-        
-        emailEntry = tk.Entry(emailFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
+        # ROW 3: Email (left) and Contact Number (right) 👈
+        emailGroup = tk.Frame(midFrame, bg=WHITE)
+        emailGroup.grid(row=3, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
+        tk.Label(emailGroup, text="Email", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+        emailBorder = tk.Frame(emailGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        emailBorder.pack(fill="x")
+        emailEntry = tk.Entry(emailBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
         emailEntry.pack(fill="x", padx=5, pady=4)
 
-        # Bottom Frame (Buttons)
+        contactGroup = tk.Frame(midFrame, bg=WHITE)
+        contactGroup.grid(row=3, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 15))
+        tk.Label(contactGroup, text="Contact Number", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+        contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        contactBorder.pack(fill="x")
+        contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
+        contactEntry.pack(fill="x", padx=5, pady=4)
+
+        # Bottom Frame
         bottomFrame = tk.Frame(addStaff, bg=content_color)
         bottomFrame.pack(fill="x", padx=15, pady=15)
 
-        saveStaffBtn = tk.Button(bottomFrame, text="Add Staff", font=UNIFORM_FONT)
+        saveStaffBtn = tk.Button(bottomFrame, text="Add Staff", font=UNIFORM_FONT, command=save_staff)
         saveStaffBtn.pack(side="right", padx=(5, 0))
 
-        cancelBtn = tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT)
+        cancelBtn = tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT, command=addStaff.destroy)
         cancelBtn.pack(side="right")
 
         addStaff.mainloop()
 
+
+       
+        
+            
     def CSassign_window():
         assign = Toplevel()
         assign.title("Assign Cleaning")
@@ -880,7 +923,7 @@ def main():
         upperFrame = tk.Frame(page, bg=content_color)
         cleaningStaffLabel = tk.Label(upperFrame, text="Cleaning Staff",bg=content_color, fg=FG_DARK,
             font=("Segoe UI", 17, "bold")).pack(side="left")
-        addStaffBtn = tk.Button(upperFrame, text="+ Add Staff", command=addCleaningStaff, bg=WHITE, fg=FG_DARK,
+        addStaffBtn = tk.Button(upperFrame, text="+ Add Staff", command=lambda: addCleaningStaff(tree), bg=WHITE, fg=FG_DARK,
                 font=UNIFORM_FONT, relief="solid", bd=1,
                 padx=12, pady=5, cursor="hand2").pack(side="right")
         
@@ -975,6 +1018,19 @@ def main():
         btnFrame.pack(fill="x", padx=16, pady=10)
         instrucLabel.pack(fill="x", padx=20, pady=(0, 10))
 
+        def add_staff_treeview():
+            for row in tree.get_children():
+                tree.delete(row)
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                cursor.execute(""" SELECT cs_ID, full_name, contact, email FROM cleaningStaff """)
+                for row in cursor.fetchall():
+                    tree.insert("", "end", values=row)
+        
+        add_staff_treeview()
+
+
+
     def build_settings_page(page):
         tk.Label(page, text="FOR LOG OUT AND USER MANAGEMENT", bg=content_color,
                  fg=font_color_sidebar, font=("Arial", 16, "bold")).pack(pady=20)
@@ -1050,6 +1106,7 @@ def main():
                          padx=10, pady=8, cursor="hand2")
     Settings.pack(fill="x", padx=10, pady=2)
 
+
     all_buttons.extend([dashboardButton, studentButton, roomsButton, cleaningButton, Settings])
 
     dashboardButton.config(command=lambda: show_page(dashboard_page, dashboardButton))
@@ -1064,3 +1121,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
