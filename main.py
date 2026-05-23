@@ -103,7 +103,7 @@ def main():
             win = Toplevel()
             win.title("Edit Student" if edit_item else "Add Student")
             win.config(bg=content_color)
-            win.geometry("420x420")
+            win.geometry("500x400")
             win.resizable(False, False)
 
             tk.Frame(win, bg=content_color)
@@ -117,53 +117,63 @@ def main():
             midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=15,
                                 bd=1, relief="solid", highlightbackground=BORDER)
             midFrame.pack(fill="both", expand=True, padx=15, pady=5)
-            midFrame.columnconfigure(0, weight=1)
-            midFrame.columnconfigure(1, weight=1)
+            midFrame.columnconfigure(0, weight=2)
+            midFrame.columnconfigure(1, weight=2)
+            midFrame.columnconfigure(2, weight=0)
 
-            tk.Label(midFrame, text="Student No.", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Name", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0,2))
-
-            def make_entry(parent, row, col, colspan=1, padx=(0,0)):
+            def make_entry(parent, row, col, colspan=1, padx=(0,0), width=None):
                 border = tk.Frame(parent, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 border.grid(row=row, column=col, columnspan=colspan, sticky="we",
                             padx=padx, pady=(0,10))
-                e = tk.Entry(border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                kw = dict(bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                if width:
+                    kw["width"] = width
+                e = tk.Entry(border, **kw)
                 e.pack(fill="x", padx=5, pady=3)
                 return e
 
-            e_no      = make_entry(midFrame, 1, 0, padx=(0,8))
-            e_name    = make_entry(midFrame, 1, 1)
+            # Row 0-1: Student No. (full width)
+            tk.Label(midFrame, text="Student No.", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0,2))
+            e_no = make_entry(midFrame, 1, 0, colspan=3)
 
+            # Row 2-3: Last Name | First Name | M.I.
+            tk.Label(midFrame, text="Last Name", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="First Name", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", padx=6, pady=(0,2))
+            tk.Label(midFrame, text="M.I.", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=2, sticky="w", padx=(6,0), pady=(0,2))
+
+            e_last  = make_entry(midFrame, 3, 0, padx=(0,6))
+            e_first = make_entry(midFrame, 3, 1, padx=(6,6))
+            e_mi    = make_entry(midFrame, 3, 2, padx=(6,0), width=3)
+
+            # Row 4-5: Program | Status
             tk.Label(midFrame, text="Program", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0,2))
-
-            e_program = make_entry(midFrame, 3, 0, padx=(0,8))
-            e_room    = make_entry(midFrame, 3, 1)
-
+                     font=UNIFORM_FONT).grid(row=4, column=0, sticky="w", padx=(0,6), pady=(0,2))
             tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=4, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Contact", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", pady=(0,2))
+                     font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", padx=6, pady=(0,2))
+
+            e_program = make_entry(midFrame, 5, 0, padx=(0,6))
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
                                       values=["Active", "Inactive", "On Leave"],
                                       state="readonly", font=UNIFORM_FONT)
-            statusDrop.grid(row=5, column=0, sticky="we", padx=(0,8), pady=(0,10))
+            statusDrop.grid(row=5, column=1, columnspan=2, sticky="we", padx=(6,0), pady=(0,10))
             statusDrop.current(0)
 
-            e_contact = make_entry(midFrame, 5, 1)
+            # Row 6-7: Contact (full width)
+            tk.Label(midFrame, text="Contact", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=6, column=0, columnspan=3, sticky="w", pady=(0,2))
+            e_contact = make_entry(midFrame, 7, 0, colspan=3)
 
             if prefill:
-                e_no.insert(0, prefill[0])
-                e_name.insert(0, prefill[1])
+                e_no.insert(0,      prefill[0])
+                e_last.insert(0,    prefill[1])
                 e_program.insert(0, prefill[2])
-                e_room.insert(0, prefill[3])
-                statusVar.set(prefill[4])
+                statusVar.set(      prefill[4])
                 e_contact.insert(0, prefill[5])
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
@@ -171,20 +181,23 @@ def main():
 
             def save():
                 no      = e_no.get().strip()
-                name    = e_name.get().strip()
+                last    = e_last.get().strip()
+                first   = e_first.get().strip()
+                mi      = e_mi.get().strip()
                 program = e_program.get().strip()
-                room    = e_room.get().strip()
                 status  = statusVar.get()
                 contact = e_contact.get().strip()
 
-                if not no or not name:
-                    err_label.config(text="Student No. and Name are required.")
+                if not no or not last or not first:
+                    err_label.config(text="Student No., Last Name and First Name are required.")
                     return
 
+                full_name = f"{last}, {first} {mi}".strip().rstrip(",").strip()
+
                 if edit_item:
-                    tree.item(edit_item, values=(no, name, program, room, status, contact))
+                    tree.item(edit_item, values=(no, full_name, program, "", status, contact))
                 else:
-                    tree.insert("", "end", values=(no, name, program, room, status, contact))
+                    tree.insert("", "end", values=(no, full_name, program, "", status, contact))
 
                 update_count()
                 win.destroy()
@@ -1121,5 +1134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
