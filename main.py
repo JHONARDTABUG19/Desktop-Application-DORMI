@@ -1130,6 +1130,26 @@ def main():
 
     show_page(dashboard_page, dashboardButton)
 
+    #if wala kapang database ng dorm management, pang cleaning staff palang to
+    def create_database():
+        conn = sqlite3.connect("dorm_management.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cleaningStaff (
+            cs_ID TEXT PRIMARY KEY,
+            last_name TEXT,
+            first_name TEXT,
+            middle_initial TEXT,
+            email TEXT,
+            contact TEXT,
+            full_name TEXT
+        )
+    """)
+        conn.commit()
+        conn.close()
+
+    create_database()
+
     root.mainloop()
 
 if __name__ == "__main__":
