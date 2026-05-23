@@ -10,7 +10,6 @@ import sqlite3
 
 
 def create_table_for_login():
-
     connect = sqlite3.connect("dorm_management.db")
     cursor = connect.cursor()
 
@@ -21,16 +20,16 @@ def create_table_for_login():
         password VARCHAR(255) NOT NULL)
     """)
 
-    # INSERT ADMIN ACCOUNT
-    cursor.execute("""
-    INSERT INTO Admin (username, password)
-    VALUES (?, ?)""", ("admin", "admin123"))
+    # Only insert default admin if table is empty
+    cursor.execute("SELECT COUNT(*) FROM Admin")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+        INSERT INTO Admin (username, password)
+        VALUES (?, ?)""", ("admin", "admin123"))
 
     connect.commit()
     connect.close()
 
-
-create_table_for_login()
 
 create_table_for_login()
 
@@ -71,7 +70,7 @@ def login_page():
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("main files/dormyz.png")
+      img_raw = Image.open("dormyz.png")
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
@@ -109,8 +108,3 @@ def login_page():
 
       
 login_page()
-
-
-
-
-
