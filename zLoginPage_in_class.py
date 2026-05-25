@@ -4,9 +4,6 @@ from PIL import Image, ImageTk
 from zDesktop_in_class import main
 import sqlite3
 
-DB_NAME = "dorm_management.db"
-
-import sqlite3
 
 
 def create_table_for_login():
@@ -16,24 +13,24 @@ def create_table_for_login():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Admin (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username VARCHAR(255) NOT NULL,
+        username VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL)
     """)
 
-    # Only insert default admin if table is empty
-    cursor.execute("SELECT COUNT(*) FROM Admin")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-        INSERT INTO Admin (username, password)
-        VALUES (?, ?)""", ("admin", "admin123"))
+    cursor.execute("""
+    INSERT OR IGNORE INTO Admin (username, password)
+    VALUES (?, ?)""", ("admin", "admin123"))
 
     connect.commit()
     connect.close()
 
 
-create_table_for_login()
 
-def login_page():
+def login_page(): 
+      
+      DB_NAME = "dorm_management.db"
+
+      create_table_for_login()
       
       def login_action():
         username = username_entry.get()
@@ -42,8 +39,7 @@ def login_page():
         if check_login_entry(username, password):
             messagebox.showinfo("Success", "Login Successful")
             root.destroy()
-            app = main()
-            app.mainloop()
+            main()
         else:
             messagebox.showerror("Error", "Invalid Username or Password")
 
@@ -51,7 +47,7 @@ def login_page():
             connect = sqlite3.connect(DB_NAME)
             cursor = connect.cursor()
             cursor.execute(
-                  "SELECT * FROM Admin WHERE username=? AND password=?", (username, password))
+                  "SELECT * FROM Admin WHERE USERNAME=? AND PASSWORD=?", (username, password))
             result = cursor.fetchone()
             connect.close()
             return result is not None
@@ -109,3 +105,8 @@ def login_page():
 
       
 login_page()
+
+
+
+
+
