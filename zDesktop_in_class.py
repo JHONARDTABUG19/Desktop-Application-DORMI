@@ -23,7 +23,60 @@ black = "#070707"
 DB_NAME = "dorm_management.db"
 
 class Database:
-    
+
+    def create_student_table(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS students
+                (
+                    student_no VARCHAR(255) PRIMARY KEY,
+                    last_name VARCHAR(255) NOT NULL,
+                    first_name VARCHAR(255) NOT NULL,
+                    middle_initial VARCHAR(255),
+                    program VARCHAR(255) NOT NULL,
+                    status VARCHAR(255) NOT NULL,
+                    contact VARCHAR(255) NOT NULL
+                )
+            """)
+            connect.commit()
+
+    def add_student(self, student_no, last, first, mi, program, status, contact):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute(
+                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (student_no, last, first, mi, program, status, contact)
+            )
+            connect.commit()
+
+    def get_all_students(self, tree):
+        for row in tree.get_children():
+            tree.delete(row)
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT student_no, TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name), program, '', status, contact FROM students")
+            for row in cursor.fetchall():
+                tree.insert("", "end", values=row)
+
+    def update_student(self, original_no, student_no, last, first, mi, program, status, contact):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                UPDATE students
+                SET student_no=?, last_name=?, first_name=?, middle_initial=?,
+                    program=?, status=?, contact=?
+                WHERE student_no=?
+            """, (student_no, last, first, mi, program, status, contact, original_no))
+            connect.commit()
+
+
+    def delete_student(self, student_no):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("DELETE FROM students WHERE student_no=?", (student_no,))
+            connect.commit()
+
     def create_table_cleaning_staff(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -49,7 +102,7 @@ class Database:
             cursor.execute("SELECT cs_ID, full_name, contact, email FROM cleaningStaff")
             for row in cursor.fetchall():
                 cleaning_tree.insert("", "end", values=row)
-            
+
     def insert_cleaning_staff(self, cs_ID, last, first, mi, email, contact, full_name):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -58,6 +111,7 @@ class Database:
                 (cs_ID, last, first, mi, email, contact, full_name)
             )
             connect.commit()
+        
 
     
             
@@ -78,6 +132,7 @@ class main(tk.Tk):
         self.title("Dormi Admin Panel")
         self.db = Database()
         self.db.create_table_cleaning_staff()
+        self.db.create_student_table()
 
         self.all_pages   = []
         self.all_buttons = []
@@ -232,17 +287,18 @@ class main(tk.Tk):
         tk.Label(page, text="Recent student assignments", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
 
-        self.treeStuAss = ttk.Treeview(page,
-                                       columns=("Student", "Room", "Start Date", "Status"),
-                                       show="headings")
+        self.treeStuAss = ttk.Treeview(page, columns=("Student", "Room", "Start Date", "Status"), show="headings")
+
         self.treeStuAss.heading("Student",    text="Student Name")
         self.treeStuAss.heading("Room",       text="Room")
         self.treeStuAss.heading("Start Date", text="Start Date")
         self.treeStuAss.heading("Status",     text="Status")
+
         self.treeStuAss.column("Student",    width=150)
         self.treeStuAss.column("Room",       width=50)
         self.treeStuAss.column("Start Date", width=75)
         self.treeStuAss.column("Status",     width=75)
+
         self.treeStuAss.pack(fill="both", padx=20, pady=10)
 
         tk.Label(page, text="Cleaning assignments today", bg=content_color,
@@ -266,11 +322,12 @@ class main(tk.Tk):
     # ── Students page ─────────────────────────────────────────────────
     def build_students_page(self, page):
 
+        
         def add_student_window(prefill=None, edit_item=None):
             win = tk.Toplevel()
             win.title("Edit Student" if edit_item else "Add Student")
             win.config(bg=content_color)
-            win.geometry("420x420")
+            win.geometry("500x400")
             win.resizable(False, False)
 
             tk.Frame(win, bg=content_color)
@@ -281,89 +338,115 @@ class main(tk.Tk):
                      bg=content_color, fg=FG_DARK,
                      font=("Segoe UI", 15, "bold")).pack(side="left")
 
-            midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=15,
+            midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=5,
                                 bd=1, relief="solid", highlightbackground=BORDER)
             midFrame.pack(fill="both", expand=True, padx=15, pady=5)
-            midFrame.columnconfigure(0, weight=1)
-            midFrame.columnconfigure(1, weight=1)
+            midFrame.columnconfigure(0, weight=2)
+            midFrame.columnconfigure(1, weight=2)
+            midFrame.columnconfigure(2, weight=0)
 
-            tk.Label(midFrame, text="Student No.", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Name", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0,2))
-
-            def make_entry(parent, row, col, colspan=1, padx=(0,0)):
+            def make_entry(parent, row, col, colspan=1, padx=(0,0), width=None):
                 border = tk.Frame(parent, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 border.grid(row=row, column=col, columnspan=colspan, sticky="we",
                             padx=padx, pady=(0,10))
-                e = tk.Entry(border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                kw = dict(bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                if width:
+                    kw["width"] = width
+                e = tk.Entry(border, **kw)
                 e.pack(fill="x", padx=5, pady=3)
                 return e
 
-            e_no      = make_entry(midFrame, 1, 0, padx=(0,8))
-            e_name    = make_entry(midFrame, 1, 1)
+            # Row 0-1: Student No. (full width)
+            tk.Label(midFrame, text="Student No.", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0,2))
+            e_no = make_entry(midFrame, 1, 0, colspan=3)
 
+            # Row 2-3: Last Name | First Name | M.I.
+            tk.Label(midFrame, text="Last Name", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="First Name", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", padx=6, pady=(0,2))
+            tk.Label(midFrame, text="M.I.", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=2, column=2, sticky="w", padx=(6,0), pady=(0,2))
+
+            e_last  = make_entry(midFrame, 3, 0, padx=(0,6))
+            e_first = make_entry(midFrame, 3, 1, padx=(6,6))
+            e_mi    = make_entry(midFrame, 3, 2, padx=(6,0), width=3)
+
+            # Row 4-5: Program | Status
             tk.Label(midFrame, text="Program", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0,2))
-
-            e_program = make_entry(midFrame, 3, 0, padx=(0,8))
-            e_room    = make_entry(midFrame, 3, 1)
-
+                     font=UNIFORM_FONT).grid(row=4, column=0, sticky="w", padx=(0,6), pady=(0,2))
             tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=4, column=0, sticky="w", padx=(0,8), pady=(0,2))
-            tk.Label(midFrame, text="Contact", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", pady=(0,2))
+                     font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", padx=6, pady=(0,2))
+
+            e_program = make_entry(midFrame, 5, 0, padx=(0,6))
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
                                       values=["Active", "Inactive", "On Leave"],
                                       state="readonly", font=UNIFORM_FONT)
-            statusDrop.grid(row=5, column=0, sticky="we", padx=(0,8), pady=(0,10))
+            statusDrop.grid(row=5, column=1, columnspan=2, sticky="we", padx=(6,0), pady=(0,10))
             statusDrop.current(0)
 
-            e_contact = make_entry(midFrame, 5, 1)
+            # Row 6-7: Contact (full width)
+            tk.Label(midFrame, text="Contact", bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT).grid(row=6, column=0, columnspan=3, sticky="w", pady=(0,2))
+            e_contact = make_entry(midFrame, 7, 0, colspan=3)
 
             if prefill:
-                e_no.insert(0, prefill[0])
-                e_name.insert(0, prefill[1])
+                e_no.insert(0,      prefill[0])
                 e_program.insert(0, prefill[2])
-                e_room.insert(0, prefill[3])
-                statusVar.set(prefill[4])
+                statusVar.set(      prefill[4])
                 e_contact.insert(0, prefill[5])
+
+                parts = prefill[1].split()
+                e_first.insert(0, parts[0])
+                
+                if len(parts) == 3:
+                    e_mi.insert(0,   parts[1].replace(".", ""))
+                    e_last.insert(0, parts[2])
+                elif len(parts) == 2:
+                    e_last.insert(0, parts[1])
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_label.pack()
 
             def save():
                 no      = e_no.get().strip()
-                name    = e_name.get().strip()
+                last    = e_last.get().strip()
+                first   = e_first.get().strip()
+                mi      = e_mi.get().strip()
                 program = e_program.get().strip()
-                room    = e_room.get().strip()
                 status  = statusVar.get()
                 contact = e_contact.get().strip()
 
-                if not no or not name:
-                    err_label.config(text="Student No. and Name are required.")
+                if not no or not last or not first:
+                    err_label.config(text="Student No., Last Name and First Name are required.")
                     return
 
+                full_name = f"{first} {f'{mi}. ' if mi else ''}{last}".strip()
+
                 if edit_item:
-                    self.tree.item(edit_item, values=(no, name, program, room, status, contact))
+                    # ── update DB then refresh treeview row ──
+                    original_no = self.tree.item(edit_item, "values")[0]
+                    self.db.update_student(original_no, no, last, first, mi, program, status, contact)
+                    self.tree.item(edit_item, values=(no, full_name, program, "", status, contact))
                 else:
-                    self.tree.insert("", "end", values=(no, name, program, room, status, contact))
+                    # ── insert into DB then add treeview row ──
+                    self.db.add_student(no, last, first, mi, program, status, contact)
+                    self.tree.insert("", "end", values=(no, full_name, program, "", status, contact))
 
                 update_count()
                 win.destroy()
 
             bottomFrame = tk.Frame(win, bg=content_color)
-            bottomFrame.pack(fill="x", padx=15, pady=10)
+            bottomFrame.pack(fill="x", padx=15, pady=(0,20))
             tk.Button(bottomFrame, text="Save", font=UNIFORM_FONT,
-                      bg=BLACK, fg=WHITE, relief="flat", padx=12, pady=5,
-                      cursor="hand2", command=save).pack(side="right", padx=(5,0))
+                      bg=BLACK, fg=WHITE, relief="flat", padx=12, pady=0,
+                      cursor="hand2", command=save).pack(side="right", padx=5)
             tk.Button(bottomFrame, text="Cancel", font=UNIFORM_FONT,
-                      fg="#c0392b", relief="flat", padx=12, pady=5,
-                      cursor="hand2", command=win.destroy).pack(side="right")
+                      fg="#c0392b", relief="flat", padx=12, pady=0,
+                      cursor="hand2", command=win.destroy).pack(side="right", padx=5)
 
         def delete_student():
             selected = self.tree.selection()
@@ -519,6 +602,8 @@ class main(tk.Tk):
         tree_frame = tk.Frame(card, bg=WHITE)
         tree_frame.pack(fill="both", expand=True, padx=16)
 
+
+
         self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
                                  style="Students.Treeview", selectmode="browse")
         col_cfg = [
@@ -532,16 +617,6 @@ class main(tk.Tk):
         for cid, heading, width, anchor in col_cfg:
             self.tree.heading(cid, text=heading, anchor=anchor)
             self.tree.column(cid,  width=width,  anchor=anchor, stretch=True)
-
-        sample_students = [
-            ("2021-0001", "Juan dela Cruz",   "BSCS",  "101", "Active",   "09171234567"),
-            ("2021-0002", "Maria Santos",     "BSIT",  "102", "Active",   "09181234567"),
-            ("2021-0003", "Jose Reyes",       "BSECE", "103", "On Leave", "09191234567"),
-            ("2021-0004", "Ana Garcia",       "BSCS",  "104", "Active",   "09201234567"),
-            ("2021-0005", "Pedro Villanueva", "BSIT",  "",    "Inactive", "09211234567"),
-        ]
-        for row in sample_students:
-            self.tree.insert("", "end", values=row)
 
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -575,6 +650,8 @@ class main(tk.Tk):
         tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8),
                  anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+    
+        self.db.get_all_students(self.tree) #loading the treeview with the students from the database
 
     # ── Rooms page ────────────────────────────────────────────────────
     def build_rooms_page(self, page):
