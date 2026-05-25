@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
 from PIL import Image, ImageTk
-from zDesktop_in_class import main
+from main import main
 import sqlite3
 
 DB_NAME = "dorm_management.db"
