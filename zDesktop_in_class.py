@@ -23,6 +23,24 @@ black = "#070707"
 DB_NAME = "dorm_management.db"
 
 class Database:
+    
+    def create_table_cleaning_staff(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS cleaningStaff 
+                (
+                    cs_ID VARCHAR(255) PRIMARY KEY,
+                    last_name VARCHAR(255) NOT NULL,
+                    first_name VARCHAR(255) NOT NULL,
+                    middle_initial VARCHAR(255),
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    contact VARCHAR(255) NOT NULL,
+                    full_name VARCHAR(255) NOT NULL 
+                )
+            """)
+            connect.commit()
+
     def get_all_cleaning_staff(self, cleaning_tree):
         for row in cleaning_tree.get_children():
             cleaning_tree.delete(row)
@@ -32,7 +50,6 @@ class Database:
             for row in cursor.fetchall():
                 cleaning_tree.insert("", "end", values=row)
             
-
     def insert_cleaning_staff(self, cs_ID, last, first, mi, email, contact, full_name):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -40,24 +57,35 @@ class Database:
                 "INSERT INTO cleaningStaff VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (cs_ID, last, first, mi, email, contact, full_name)
             )
+            connect.commit()
 
+    
+            
+    
+    
+            
 
 
 class main(tk.Tk):
+    """ This 1st function is called in login if confirmed. Also a function that is necessary 
+    to run the whole program. It contains the layout of the whole program and the navigation 
+    of the pages. All other pages are called in this function. """
+
     def __init__(self):
         super().__init__()
         self.geometry("1200x650")
         self.minsize(1150, 650)
         self.title("Dormi Admin Panel")
         self.db = Database()
+        self.db.create_table_cleaning_staff()
 
         self.all_pages   = []
         self.all_buttons = []
 
-        self.build_layout()
+        self.main_build_layout()
 
     # ── Layout ────────────────────────────────────────────────────────
-    def build_layout(self):
+    def main_build_layout(self):
         # ── Sidebar ───────────────────────────────────────────────────
         self.sidebar = tk.Frame(self, bg=sidebar_color, width=300)      # self — referenced in show_page and sidebar buttons
         self.sidebar.pack(side="left", fill="y")
@@ -874,7 +902,7 @@ class main(tk.Tk):
                     return
 
                 self.db.insert_cleaning_staff(cs_ID, last, first, mi, email, contact, full_name)
-                self.db.get_all_cleaning_staff()
+                self.db.get_all_cleaning_staff(self.cleaning_tree)
                 addStaff.destroy()
 
             
