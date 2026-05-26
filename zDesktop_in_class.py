@@ -1,6 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import messagebox
+from tkinter import INSERT, messagebox
 import sqlite3
 
 UNIFORM_FONT = ("Segoe UI", 10)
@@ -76,6 +76,62 @@ class Database:
             cursor = connect.cursor()
             cursor.execute("DELETE FROM students WHERE student_no=?", (student_no,))
             connect.commit()
+    
+
+
+
+    def create_rooms_table(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS rooms (
+                    room_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                    building     VARCHAR(255) NOT NULL,
+                    room_number  VARCHAR(255) NOT NULL,
+                    room_type    VARCHAR(255) NOT NULL,
+                    capacity     INTEGER NOT NULL,
+                    occupants    INTEGER DEFAULT 0,
+                    status       VARCHAR(255) NOT NULL,
+                    last_cleaned VARCHAR(255) DEFAULT '—'
+                )
+            """)
+            connect.commit()
+
+    def add_room(self, building, room_number, room_type, capacity, status):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute(
+                "INSERT INTO rooms (building, room_number, room_type, capacity, status) VALUES (?, ?, ?, ?, ?)",
+                (building, room_number, room_type, capacity, status)
+            )
+            connect.commit()
+
+    def get_all_rooms(self, tree):
+        for row in tree.get_children():
+            tree.delete(row)
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms")
+            for row in cursor.fetchall():
+                room_id = row[0]
+                values  = row[1:]   # everything except room_id
+                tree.insert("", "end", values=values, tags=(room_id,))
+
+    def update_room(self, room_id, building, room_number, room_type, capacity, status):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                UPDATE rooms
+                SET building=?, room_number=?, room_type=?, capacity=?, status=?
+                WHERE room_id=?
+            """, (building, room_number, room_type, capacity, status, room_id))
+            connect.commit()
+
+    def delete_room(self, room_id):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("DELETE FROM rooms WHERE room_id=?", (room_id,))
+            connect.commit()
 
     def create_table_cleaning_staff(self):
         with sqlite3.connect(DB_NAME) as connect:
@@ -131,9 +187,10 @@ class main(tk.Tk):
         self.minsize(1150, 650)
         self.title("Dormi Admin Panel")
         self.db = Database()
-        self.db.create_table_cleaning_staff()
         self.db.create_student_table()
-
+        self.db.create_rooms_table()
+        self.db.create_table_cleaning_staff()
+        
         self.all_pages   = []
         self.all_buttons = []
 
@@ -735,7 +792,7 @@ class main(tk.Tk):
                   foreground=[("selected", FG_DARK)])
         style.layout("Rooms.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
-        columns = ("room_no", "type", "capacity", "occupants", "status", "last_cleaned")
+        columns = ("room_no", "Building", "type", "capacity", "occupants", "status", "last_cleaned")
         tree_frame = tk.Frame(card, bg=WHITE)
         tree_frame.pack(fill="both", expand=True, padx=16)
 
@@ -743,6 +800,7 @@ class main(tk.Tk):
                                        style="Rooms.Treeview", selectmode="browse")
         col_cfg = [
             ("room_no",      "Room No.",      90,  "center"),
+            ("Building",     "Building",      70,  "center"),
             ("type",         "Type",         100,  "center"),
             ("capacity",     "Capacity",      80,  "center"),
             ("occupants",    "Occupants",     90,  "center"),
@@ -753,16 +811,6 @@ class main(tk.Tk):
             self.rooms_tree.heading(cid, text=heading, anchor=anchor)
             self.rooms_tree.column(cid, width=width, anchor=anchor, stretch=True)
 
-        sample_rooms = [
-            ("101", "Single", "1", "1", "Occupied",    "May 20, 2025"),
-            ("102", "Double", "2", "0", "Vacant",       "May 19, 2025"),
-            ("103", "Triple", "3", "3", "Occupied",    "May 18, 2025"),
-            ("104", "Single", "1", "0", "Maintenance", "May 15, 2025"),
-            ("105", "Suite",  "4", "2", "Occupied",    "May 20, 2025"),
-            ("106", "Double", "2", "0", "Vacant",       "May 17, 2025"),
-        ]
-        for row in sample_rooms:
-            self.rooms_tree.insert("", "end", values=row)
 
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.rooms_tree.yview)
         self.rooms_tree.configure(yscrollcommand=scrollbar.set)
@@ -789,6 +837,28 @@ class main(tk.Tk):
             win.geometry("420x340")
             win.resizable(False, False)
 
+            def save_room():
+                room_no  = roomNumEntry.get().strip()
+                if not room_no:
+                    err_label.config(text="Room number is required.")
+                    return
+                building = buildingVar.get()
+                r_type   = typeVar.get()
+                cap      = int(capacityVar.get())
+                status   = statusVar.get()
+
+                if edit_item:
+                    # get room_id stored in the iid tag
+                    room_id = self.rooms_tree.item(edit_item, "tags")[0]
+                    self.db.update_room(room_id, building, room_no, r_type, cap, status)
+                else:
+                    self.db.add_room(building, room_no, r_type, cap, status)
+
+                # always re-fetch from DB to stay in sync
+                self.db.get_all_rooms(self.rooms_tree)
+                update_room_count()
+                win.destroy()
+
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
             tk.Label(upperFrame,
@@ -796,24 +866,44 @@ class main(tk.Tk):
                      bg=content_color, fg=FG_DARK,
                      font=("Segoe UI", 15, "bold")).pack(side="left")
 
-            midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=15,
+            midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=10,
                                 bd=1, relief="solid", highlightbackground=BORDER)
-            midFrame.pack(fill="both", expand=True, padx=15, pady=5)
+            midFrame.pack(fill="both", expand=True, padx=15, pady=(5,0))
             midFrame.columnconfigure(0, weight=1)
             midFrame.columnconfigure(1, weight=1)
 
+           # Row 0 - Labels
+            tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+
             tk.Label(midFrame, text="Room Number", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2))
+                    font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
+
+            # Row 2 - Labels
+            tk.Label(midFrame, text="Room Type", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+
+            tk.Label(midFrame, text="Capacity", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0, 2))
+            
+            # Row 4 - Status label
+            tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 2))
+
+                      # Row 1 - Building dropdown + Room number entry
+            buildingVar = tk.StringVar()
+            buildingDropdown = ttk.Combobox(midFrame, textvariable=buildingVar,
+                                            values=["BLD-A", "BLD-B", "BLD-C"],
+                                            state="readonly", font=UNIFORM_FONT)
+            buildingDropdown.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+            buildingDropdown.current(0)
+
             roomNumBorder = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            roomNumBorder.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 12))
-            roomNumEntry = tk.Entry(roomNumBorder, bg=WHITE, fg=BLACK,
-                                    font=UNIFORM_FONT, relief="flat", bd=0, insertbackground=FG_DARK)
+            roomNumBorder.grid(row=1, column=1, sticky="we", pady=(0, 12))
+            roomNumEntry = tk.Entry(roomNumBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
             roomNumEntry.pack(fill="x", padx=5, pady=3)
 
-            tk.Label(midFrame, text="Room Type", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            tk.Label(midFrame, text="Capacity", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0, 2))
 
             typeVar = tk.StringVar()
             typeDropdown = ttk.Combobox(midFrame, textvariable=typeVar,
@@ -822,50 +912,32 @@ class main(tk.Tk):
             typeDropdown.grid(row=3, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
             typeDropdown.current(0)
 
-            capVar = tk.StringVar()
-            capDropdown = ttk.Combobox(midFrame, textvariable=capVar,
-                                       values=["1", "2", "3", "4"],
-                                       state="readonly", font=UNIFORM_FONT)
+            capacityVar = tk.StringVar()
+            capDropdown = ttk.Combobox(midFrame, textvariable=capacityVar,
+                                    values=["1", "2", "3", "4"],
+                                    state="readonly", font=UNIFORM_FONT)
             capDropdown.grid(row=3, column=1, sticky="we", pady=(0, 12))
             capDropdown.current(0)
 
-            tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 2))
+            
+
+            # Row 5 - Status dropdown
             statusVar = tk.StringVar()
             statusDropdown = ttk.Combobox(midFrame, textvariable=statusVar,
-                                          values=["Vacant", "Occupied", "Under Maintenance"],
-                                          state="readonly", font=UNIFORM_FONT)
+                                        values=["Vacant", "Occupied", "Under Maintenance"],
+                                        state="readonly", font=UNIFORM_FONT)
             statusDropdown.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 4))
             statusDropdown.current(0)
 
             if prefill:
-                roomNumEntry.insert(0, prefill[0])
-                typeVar.set(prefill[1])
-                capVar.set(prefill[2])
-                statusVar.set(prefill[4])
+                buildingVar.set(prefill[1])       # building
+                roomNumEntry.insert(0, prefill[0]) # room_no
+                typeVar.set(prefill[2])            # type
+                capacityVar.set(prefill[3])        # capacity
+                statusVar.set(prefill[5])          # status
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_label.pack()
-
-            def save_room():
-                room_no = roomNumEntry.get().strip()
-                if not room_no:
-                    err_label.config(text="Room number is required.")
-                    return
-                r_type = typeVar.get()
-                cap    = capVar.get()
-                status = statusVar.get()
-
-                if edit_item:
-                    orig = self.rooms_tree.item(edit_item, "values")
-                    occupants    = orig[3]
-                    last_cleaned = orig[5]
-                    self.rooms_tree.item(edit_item, values=(room_no, r_type, cap, occupants, status, last_cleaned))
-                else:
-                    self.rooms_tree.insert("", "end", values=(room_no, r_type, cap, "0", status, "—"))
-                    update_room_count()
-
-                win.destroy()
 
             bottomFrame = tk.Frame(win, bg=content_color)
             bottomFrame.pack(fill="x", padx=15, pady=15)
@@ -882,7 +954,9 @@ class main(tk.Tk):
                 rooms_messagebox("Select a room first.", "No Selection")
                 return
             if rooms_messagebox_confirm("Delete this room? This cannot be undone."):
-                self.rooms_tree.delete(selected[0])
+                room_id = self.rooms_tree.item(selected[0], "tags")[0]
+                self.db.delete_room(room_id)
+                self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
 
         def edit_room():
@@ -891,6 +965,7 @@ class main(tk.Tk):
                 rooms_messagebox("Select a room first.", "No Selection")
                 return
             values = self.rooms_tree.item(selected[0], "values")
+            # values = (room_no, building, type, capacity, occupants, status, last_cleaned)
             add_room_window(prefill=values, edit_item=selected[0])
 
         def view_room_details():
@@ -954,6 +1029,8 @@ class main(tk.Tk):
         tk.Label(card, text="ⓘ  Click a row to select before editing, viewing details, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8),
                  anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+    
+        self.db.get_all_rooms(self.rooms_tree)
 
     # ── Cleaning page ─────────────────────────────────────────────────
     def build_cleaning_page(self, page):
