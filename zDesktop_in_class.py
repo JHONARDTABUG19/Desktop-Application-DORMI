@@ -133,6 +133,10 @@ class Database:
             cursor.execute("DELETE FROM rooms WHERE room_id=?", (room_id,))
             connect.commit()
 
+
+
+            
+
     def create_table_cleaning_staff(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
