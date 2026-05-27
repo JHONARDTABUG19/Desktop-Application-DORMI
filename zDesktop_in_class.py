@@ -390,6 +390,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("500x400")
             win.resizable(False, False)
+            win.grab_set()
 
             tk.Frame(win, bg=content_color)
             upperFrame = tk.Frame(win, bg=content_color)
@@ -538,6 +539,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("360x260")
             win.resizable(False, False)
+            win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
@@ -594,6 +596,7 @@ class main(tk.Tk):
             win.config(bg=WHITE)
             win.geometry("300x120")
             win.resizable(False, False)
+            win.grab_set()
             tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
                      font=UNIFORM_FONT, wraplength=260).pack(pady=20)
             tk.Button(win, text="OK", bg=BLACK, fg=WHITE, font=UNIFORM_FONT,
@@ -723,6 +726,7 @@ class main(tk.Tk):
             win.config(bg=WHITE)
             win.geometry("300x120")
             win.resizable(False, False)
+            win.grab_set()
             tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
                      font=UNIFORM_FONT, wraplength=260).pack(pady=20)
             tk.Button(win, text="OK", bg=BLACK, fg=WHITE, font=UNIFORM_FONT,
@@ -840,6 +844,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("420x340")
             win.resizable(False, False)
+            win.grab_set()
 
             def save_room():
                 room_no  = roomNumEntry.get().strip()
@@ -984,6 +989,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("360x320")
             win.resizable(False, False)
+            win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
@@ -1045,6 +1051,7 @@ class main(tk.Tk):
             addStaff.config(bg=content_color)
             addStaff.geometry("500x360")
             addStaff.resizable(False, False)
+            addStaff.grab_set()
 
             def save_staff():
                 cs_ID   = idEntry.get().strip()
@@ -1148,6 +1155,7 @@ class main(tk.Tk):
             assign.config(bg=content_color)
             assign.geometry("420x360")
             assign.resizable(False, False)
+            assign.grab_set()
 
             upperFrame = tk.Frame(assign, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
