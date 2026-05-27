@@ -3,6 +3,16 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 from zDesktop_in_class import main
 import sqlite3
+import sys
+import os
+
+def resource_path(relative_path):
+    """Get the correct path whether running as script or .exe"""
+    if hasattr(sys, '_MEIPASS'):
+        # running as .exe — PyInstaller extracts files here
+        return os.path.join(sys._MEIPASS, relative_path)
+    # running normally as .py
+    return os.path.join(os.path.abspath("."), relative_path)
 
 
 
@@ -67,7 +77,7 @@ def login_page():
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("dormyz.png")
+      img_raw = Image.open(resource_path("dormyz.png"))
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
