@@ -1045,249 +1045,750 @@ class main(tk.Tk):
     # ── Cleaning page ─────────────────────────────────────────────────
     def build_cleaning_page(self, page):
 
-        def addCleaningStaff():
-            addStaff = tk.Toplevel()
-            addStaff.title("Add Cleaning Staff")
-            addStaff.config(bg=content_color)
-            addStaff.geometry("500x360")
-            addStaff.resizable(False, False)
-            addStaff.grab_set()
+        def rooms_messagebox(msg, title="Info"):
+            win = tk.Toplevel()
+            win.title(title)
+            win.config(bg=WHITE)
+            win.geometry("300x120")
+            win.resizable(False, False)
+            tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT, wraplength=260).pack(pady=20)
+            tk.Button(win, text="OK", bg=BLACK, fg=WHITE, font=UNIFORM_FONT,
+                      relief="flat", padx=20, pady=4,
+                      command=win.destroy).pack()
 
-            def save_staff():
-                cs_ID   = idEntry.get().strip()
-                last    = LN_Entry.get().strip()
-                first   = FN_Entry.get().strip()
-                mi      = MI_Entry.get().strip()
-                email   = emailEntry.get().strip()
-                contact = contactEntry.get().strip()
-                full_name = f"{last}, {first} {mi}".strip()
+        def rooms_messagebox_confirm(msg):
+            result = [False]
+            win = tk.Toplevel()
+            win.title("Confirm")
+            win.config(bg=WHITE)
+            win.geometry("320x130")
+            win.resizable(False, False)
+            tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
+                     font=UNIFORM_FONT, wraplength=280).pack(pady=16)
+            btn_row = tk.Frame(win, bg=WHITE)
+            btn_row.pack()
+            def confirm():
+                result[0] = True
+                win.destroy()
+            tk.Button(btn_row, text="Delete", bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
+                      relief="flat", padx=14, pady=4,
+                      cursor="hand2", command=confirm).pack(side="left", padx=6)
+            tk.Button(btn_row, text="Cancel", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+                      relief="solid", bd=1, padx=14, pady=4,
+                      cursor="hand2", command=win.destroy).pack(side="left", padx=6)
+            win.grab_set()
+            win.wait_window()
+            return result[0]
 
-                if not cs_ID or not last or not first or not email or not contact:
-                    messagebox.showerror("Error", "Please fill in all required fields.")
-                    return
-
-                self.db.insert_cleaning_staff(cs_ID, last, first, mi, email, contact, full_name)
-                self.db.get_all_cleaning_staff(self.cleaning_tree)
-                addStaff.destroy()
-
-            
-
-            upperFrame = tk.Frame(addStaff, bg=content_color)
-            upperFrame.pack(fill="x", padx=15, pady=12)
-            tk.Label(upperFrame, text="Add Cleaning Staff", bg=content_color, fg=FG_DARK,
-                     font=("Segoe UI", 15, "bold")).pack(side="left")
-
-            midFrame = tk.Frame(addStaff, bg=WHITE, padx=15, pady=15,
-                                bd=1, relief="solid", highlightbackground=BORDER)
-            midFrame.pack(fill="x", padx=15, pady=5)
-            midFrame.columnconfigure(0, weight=2)
-            midFrame.columnconfigure(1, weight=2)
-            midFrame.columnconfigure(2, weight=0)
-
-            tk.Label(midFrame, text="Cleaning Staff ID", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
-            idFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            idFrame.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 15))
-            idEntry = tk.Entry(idFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                               relief="flat", bd=0, insertbackground=FG_DARK)
-            idEntry.pack(fill="x", padx=5, pady=4)
-
-            lnGroup = tk.Frame(midFrame, bg=WHITE)
-            lnGroup.grid(row=2, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
-            tk.Label(lnGroup, text="Last Name", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            lnBorder = tk.Frame(lnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            lnBorder.pack(fill="x")
-            LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                relief="flat", bd=0, insertbackground=FG_DARK)
-            LN_Entry.pack(fill="x", padx=5, pady=4)
-
-            fnGroup = tk.Frame(midFrame, bg=WHITE)
-            fnGroup.grid(row=2, column=1, sticky="we", padx=6, pady=(0, 15))
-            tk.Label(fnGroup, text="First Name", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            fnBorder.pack(fill="x")
-            FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                relief="flat", bd=0, insertbackground=FG_DARK)
-            FN_Entry.pack(fill="x", padx=5, pady=4)
-
-            miGroup = tk.Frame(midFrame, bg=WHITE)
-            miGroup.grid(row=2, column=2, sticky="w", padx=(6, 0), pady=(0, 15))
-            tk.Label(miGroup, text="M.I.", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            miBorder.pack()
-            MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                relief="flat", bd=0, insertbackground=FG_DARK, width=3)
-            MI_Entry.pack(padx=5, pady=4)
-
-            emailGroup = tk.Frame(midFrame, bg=WHITE)
-            emailGroup.grid(row=3, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
-            tk.Label(emailGroup, text="Email", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            emailBorder = tk.Frame(emailGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            emailBorder.pack(fill="x")
-            emailEntry = tk.Entry(emailBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                  relief="flat", bd=0, insertbackground=FG_DARK)
-            emailEntry.pack(fill="x", padx=5, pady=4)
-
-            contactGroup = tk.Frame(midFrame, bg=WHITE)
-            contactGroup.grid(row=3, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 15))
-            tk.Label(contactGroup, text="Contact Number", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            contactBorder.pack(fill="x")
-            contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK)
-            contactEntry.pack(fill="x", padx=5, pady=4)
-
-            bottomFrame = tk.Frame(addStaff, bg=content_color)
-            bottomFrame.pack(fill="x", padx=15, pady=15)
-            tk.Button(bottomFrame, text="Add Staff", font=UNIFORM_FONT,
-                      command=save_staff).pack(side="right", padx=(5, 0))
-            tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
-                      command=addStaff.destroy).pack(side="right")
-
-        def CSassign_window():
-            assign = tk.Toplevel()
-            assign.title("Assign Cleaning")
-            assign.config(bg=content_color)
-            assign.geometry("420x360")
-            assign.resizable(False, False)
-            assign.grab_set()
-
-            upperFrame = tk.Frame(assign, bg=content_color)
-            upperFrame.pack(fill="x", padx=15, pady=12)
-            tk.Label(upperFrame, text="Assign Cleaning", bg=content_color, fg=FG_DARK,
-                     font=("Segoe UI", 15, "bold")).pack(side="left")
-
-            midFrame = tk.Frame(assign, bg=WHITE, padx=15, pady=15,
-                                bd=1, relief="solid", highlightbackground=BORDER)
-            midFrame.pack(fill="both", expand=True, padx=15, pady=5)
-            midFrame.columnconfigure(0, weight=1)
-            midFrame.columnconfigure(1, weight=1)
-
-            tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2))
-            roomSelection = tk.StringVar()
-            roomOptions = ["Option 1", "Option 2", "Option 3"]
-            roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=roomOptions,
-                                        state="readonly", font=UNIFORM_FONT)
-            roomDropdown.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 12))
-            roomDropdown.current(0)
-
-            tk.Label(midFrame, text="Date", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 2))
-            searchFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            searchFrame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 12))
-            dateEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                 relief="flat", bd=0, insertbackground=FG_DARK)
-            dateEntry.pack(fill="x", padx=5, pady=3)
-
-            timeStartFrame = tk.Frame(midFrame, bg=WHITE)
-            timeStartFrame.grid(row=4, column=0, sticky="we", padx=(0, 8))
-            tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            tStartBorder = tk.Frame(timeStartFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            tStartBorder.pack(fill="x")
-            timeStartEntry = tk.Entry(tStartBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                      relief="flat", bd=0)
-            timeStartEntry.pack(fill="x", padx=5, pady=3)
-
-            timeEndFrame = tk.Frame(midFrame, bg=WHITE)
-            timeEndFrame.grid(row=4, column=1, sticky="we", padx=(8, 0))
-            tk.Label(timeEndFrame, text="Time End", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            tEndBorder = tk.Frame(timeEndFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            tEndBorder.pack(fill="x")
-            timeEndEntry = tk.Entry(tEndBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0)
-            timeEndEntry.pack(fill="x", padx=5, pady=3)
-
-            bottomFrame = tk.Frame(assign, bg=content_color)
-            bottomFrame.pack(fill="x", padx=15, pady=15)
-            tk.Button(bottomFrame, text="Save Schedule",
-                      font=UNIFORM_FONT).pack(side="right", padx=(5, 0))
-            tk.Button(bottomFrame, text="Cancel", fg="#c0392b",
-                      font=UNIFORM_FONT).pack(side="right")
-
-
-        # ── Top bar ───────────────────────────────────────────────────
-        upperFrame = tk.Frame(page, bg=content_color)
-        upperFrame.pack(fill="x", padx=28, pady=(20, 12))
-        tk.Label(upperFrame, text="Cleaning Staff", bg=content_color, fg=FG_DARK,
+        topbar = tk.Frame(page, bg=content_color)
+        topbar.pack(fill="x", padx=28, pady=(20, 12))
+        tk.Label(topbar, text="Rooms", bg=content_color, fg=FG_DARK,
                  font=("Segoe UI", 17, "bold")).pack(side="left")
-        tk.Button(upperFrame, text="+ Add Staff", command=addCleaningStaff,
-                  bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT, relief="solid", bd=1,
-                  padx=12, pady=5, cursor="hand2").pack(side="right")
+        add_btn = tk.Button(topbar, text="+ Add room", bg=WHITE, fg=FG_DARK,
+                            font=UNIFORM_FONT, relief="solid", bd=1,
+                            padx=12, pady=5, cursor="hand2")
+        add_btn.pack(side="right")
 
-        # ── Card ──────────────────────────────────────────────────────
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-        searchFrame = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        searchFrame.pack(fill="x", padx=16, pady=(14, 10))
-        tk.Label(searchFrame, text="🔍", bg=WHITE, fg=FG_MUTED,
+        search_wrap = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap.pack(fill="x", padx=16, pady=(14, 10))
+        tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
                  font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        CSsearchEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK,
-                                 font=UNIFORM_FONT, relief="flat", bd=0,
-                                 insertbackground=FG_DARK)
-        CSsearchEntry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+        search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+                                font=UNIFORM_FONT, relief="flat", bd=0,
+                                insertbackground=FG_DARK)
+        search_entry.insert(0, "Search by room number or type...")
+        search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        filter_frame = tk.Frame(card, bg=WHITE)
+        filter_frame.pack(fill="x", padx=16, pady=(0, 8))
+        tk.Label(filter_frame, text="Filter:", bg=WHITE, fg=FG_MUTED,
+                 font=("Segoe UI", 9)).pack(side="left", padx=(0, 6))
+        for label, color in [("All", FG_DARK), ("Vacant", "#27ae60"),
+                              ("Occupied", "#8e44ad"), ("Maintenance", "#e67e22")]:
+            tk.Button(filter_frame, text=label, bg=WHITE, fg=color,
+                      font=("Segoe UI", 8), relief="solid", bd=1,
+                      padx=10, pady=3, cursor="hand2").pack(side="left", padx=3)
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("CleaningStaff.Treeview", background=WHITE, foreground=FG_DARK,
+        style.configure("Rooms.Treeview", background=WHITE, foreground=FG_DARK,
                         rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-        style.configure("CleaningStaff.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+        style.configure("Rooms.Treeview.Heading", background=HEADER_BG, foreground="#555577",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
-        style.map("CleaningStaff.Treeview",
+        style.map("Rooms.Treeview",
                   background=[("selected", ROW_SEL)],
                   foreground=[("selected", FG_DARK)])
-        style.layout("CleaningStaff.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+        style.layout("Rooms.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
+        columns = ("room_no", "Building", "type", "capacity", "occupants", "status", "last_cleaned")
         tree_frame = tk.Frame(card, bg=WHITE)
         tree_frame.pack(fill="both", expand=True, padx=16)
 
-        self.cleaning_tree = ttk.Treeview(tree_frame,                          # self — used by add_staff_treeview
-                                          columns=("CS_ID", "CS_NAME", "CS_CONTACT", "CS_EMAIL"),
-                                          show="headings",
-                                          style="CleaningStaff.Treeview")
-        self.cleaning_tree.heading("CS_ID",      text="Staff ID")
-        self.cleaning_tree.heading("CS_NAME",    text="Name")
-        self.cleaning_tree.heading("CS_CONTACT", text="Contact")
-        self.cleaning_tree.heading("CS_EMAIL",   text="Email")
-        self.cleaning_tree.column("CS_ID",      width=80)
-        self.cleaning_tree.column("CS_NAME",    width=200)
-        self.cleaning_tree.column("CS_CONTACT", width=300)
-        self.cleaning_tree.column("CS_EMAIL",   width=300)
+        self.rooms_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                       style="Rooms.Treeview", selectmode="browse")
+        col_cfg = [
+            ("room_no",      "Room No.",      90,  "center"),
+            ("Building",     "Building",      70,  "center"),
+            ("type",         "Type",         100,  "center"),
+            ("capacity",     "Capacity",      80,  "center"),
+            ("occupants",    "Occupants",     90,  "center"),
+            ("status",       "Status",       120,  "center"),
+            ("last_cleaned", "Last Cleaned", 140,  "w"),
+        ]
+        for cid, heading, width, anchor in col_cfg:
+            self.rooms_tree.heading(cid, text=heading, anchor=anchor)
+            self.rooms_tree.column(cid, width=width, anchor=anchor, stretch=True)
 
-        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.cleaning_tree.yview)
-        self.cleaning_tree.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.rooms_tree.yview)
+        self.rooms_tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
-        self.cleaning_tree.pack(side="left", fill="both", expand=True)
+        self.rooms_tree.pack(side="left", fill="both", expand=True)
 
         tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(6, 0))
 
-        btnFrame = tk.Frame(card, bg=WHITE)
-        btnFrame.pack(fill="x", padx=16, pady=10)
+        action_bar = tk.Frame(card, bg=WHITE)
+        action_bar.pack(fill="x", padx=16, pady=10)
+
+        room_count_label = tk.Label(action_bar, text="6 rooms total", bg=WHITE,
+                                    fg=FG_MUTED, font=UNIFORM_FONT)
+        room_count_label.pack(side="left", padx=(4, 0))
+
+        def update_room_count():
+            count = len(self.rooms_tree.get_children())
+            room_count_label.config(text=f"{count} room{'s' if count != 1 else ''} total")
+
+        def add_room_window(prefill=None, edit_item=None):
+            win = tk.Toplevel()
+            win.title("Edit Room" if edit_item else "Add Room")
+            win.config(bg=content_color)
+            win.geometry("420x340")
+            win.resizable(False, False)
+
+            def save_room():
+                room_no  = roomNumEntry.get().strip()
+                if not room_no:
+                    err_label.config(text="Room number is required.")
+                    return
+                building = buildingVar.get()
+                r_type   = typeVar.get()
+                cap      = int(capacityVar.get())
+                status   = statusVar.get()
+
+                if edit_item:
+                    # get room_id stored in the iid tag
+                    room_id = self.rooms_tree.item(edit_item, "tags")[0]
+                    self.db.update_room(room_id, building, room_no, r_type, cap, status)
+                else:
+                    self.db.add_room(building, room_no, r_type, cap, status)
+
+                # always re-fetch from DB to stay in sync
+                self.db.get_all_rooms(self.rooms_tree)
+                update_room_count()
+                win.destroy()
+
+            upperFrame = tk.Frame(win, bg=content_color)
+            upperFrame.pack(fill="x", padx=15, pady=12)
+            tk.Label(upperFrame,
+                     text="Edit Room" if edit_item else "Add Room",
+                     bg=content_color, fg=FG_DARK,
+                     font=("Segoe UI", 15, "bold")).pack(side="left")
+
+            midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=10,
+                                bd=1, relief="solid", highlightbackground=BORDER)
+            midFrame.pack(fill="both", expand=True, padx=15, pady=(5,0))
+            midFrame.columnconfigure(0, weight=1)
+            midFrame.columnconfigure(1, weight=1)
+
+           # Row 0 - Labels
+            tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+
+            tk.Label(midFrame, text="Room Number", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
+
+            # Row 2 - Labels
+            tk.Label(midFrame, text="Room Type", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+
+            tk.Label(midFrame, text="Capacity", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0, 2))
+            
+            # Row 4 - Status label
+            tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 2))
+
+                      # Row 1 - Building dropdown + Room number entry
+            buildingVar = tk.StringVar()
+            buildingDropdown = ttk.Combobox(midFrame, textvariable=buildingVar,
+                                            values=["BLD-A", "BLD-B", "BLD-C"],
+                                            state="readonly", font=UNIFORM_FONT)
+            buildingDropdown.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+            buildingDropdown.current(0)
+
+            roomNumBorder = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            roomNumBorder.grid(row=1, column=1, sticky="we", pady=(0, 12))
+            roomNumEntry = tk.Entry(roomNumBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
+            roomNumEntry.pack(fill="x", padx=5, pady=3)
+
+
+            typeVar = tk.StringVar()
+            typeDropdown = ttk.Combobox(midFrame, textvariable=typeVar,
+                                        values=["Single", "Double", "Triple", "Suite"],
+                                        state="readonly", font=UNIFORM_FONT)
+            typeDropdown.grid(row=3, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+            typeDropdown.current(0)
+
+            capacityVar = tk.StringVar()
+            capDropdown = ttk.Combobox(midFrame, textvariable=capacityVar,
+                                    values=["1", "2", "3", "4"],
+                                    state="readonly", font=UNIFORM_FONT)
+            capDropdown.grid(row=3, column=1, sticky="we", pady=(0, 12))
+            capDropdown.current(0)
+
+            
+
+            # Row 5 - Status dropdown
+            statusVar = tk.StringVar()
+            statusDropdown = ttk.Combobox(midFrame, textvariable=statusVar,
+                                        values=["Vacant", "Occupied", "Under Maintenance"],
+                                        state="readonly", font=UNIFORM_FONT)
+            statusDropdown.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 4))
+            statusDropdown.current(0)
+
+            if prefill:
+                buildingVar.set(prefill[1])       # building
+                roomNumEntry.insert(0, prefill[0]) # room_no
+                typeVar.set(prefill[2])            # type
+                capacityVar.set(prefill[3])        # capacity
+                statusVar.set(prefill[5])          # status
+
+            err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
+            err_label.pack()
+
+            bottomFrame = tk.Frame(win, bg=content_color)
+            bottomFrame.pack(fill="x", padx=15, pady=15)
+            tk.Button(bottomFrame, text="Save", font=UNIFORM_FONT,
+                      bg=BLACK, fg=WHITE, relief="flat", padx=12, pady=5,
+                      cursor="hand2", command=save_room).pack(side="right", padx=(5, 0))
+            tk.Button(bottomFrame, text="Cancel", font=UNIFORM_FONT,
+                      fg="#c0392b", relief="flat", padx=12, pady=5,
+                      cursor="hand2", command=win.destroy).pack(side="right")
+
+        def delete_room():
+            selected = self.rooms_tree.selection()
+            if not selected:
+                rooms_messagebox("Select a room first.", "No Selection")
+                return
+            if rooms_messagebox_confirm("Delete this room? This cannot be undone."):
+                room_id = self.rooms_tree.item(selected[0], "tags")[0]
+                self.db.delete_room(room_id)
+                self.db.get_all_rooms(self.rooms_tree)
+                update_room_count()
+
+        def edit_room():
+            selected = self.rooms_tree.selection()
+            if not selected:
+                rooms_messagebox("Select a room first.", "No Selection")
+                return
+            values = self.rooms_tree.item(selected[0], "values")
+            # values = (room_no, building, type, capacity, occupants, status, last_cleaned)
+            add_room_window(prefill=values, edit_item=selected[0])
+
+        def view_room_details():
+            selected = self.rooms_tree.selection()
+            if not selected:
+                rooms_messagebox("Select a room first.", "No Selection")
+                return
+            values = self.rooms_tree.item(selected[0], "values")
+
+            win = tk.Toplevel()
+            win.title(f"Room {values[0]} — Details")
+            win.config(bg=content_color)
+            win.geometry("360x320")
+            win.resizable(False, False)
+
+            upperFrame = tk.Frame(win, bg=content_color)
+            upperFrame.pack(fill="x", padx=15, pady=12)
+            tk.Label(upperFrame, text=f"Room {values[0]} Details",
+                     bg=content_color, fg=FG_DARK,
+                     font=("Segoe UI", 15, "bold")).pack(side="left")
+
+            midFrame = tk.Frame(win, bg=WHITE, padx=20, pady=20,
+                                bd=1, relief="solid", highlightbackground=BORDER)
+            midFrame.pack(fill="both", expand=True, padx=15, pady=5)
+            midFrame.columnconfigure(0, weight=1)
+            midFrame.columnconfigure(1, weight=2)
+
+            fields = [
+                ("Room Number",  values[0]),
+                ("Room Type",    values[1]),
+                ("Capacity",     values[2]),
+                ("Occupants",    values[3]),
+                ("Status",       values[4]),
+                ("Last Cleaned", values[5]),
+            ]
+            for i, (label, value) in enumerate(fields):
+                tk.Label(midFrame, text=label, bg=WHITE, fg=FG_MUTED,
+                         font=("Segoe UI", 9)).grid(row=i, column=0, sticky="w", pady=5)
+                tk.Label(midFrame, text=value, bg=WHITE, fg=FG_DARK,
+                         font=("Segoe UI", 10, "bold")).grid(row=i, column=1, sticky="w", pady=5, padx=(10, 0))
+
+            bottomFrame = tk.Frame(win, bg=content_color)
+            bottomFrame.pack(fill="x", padx=15, pady=10)
+            tk.Button(bottomFrame, text="Close", font=UNIFORM_FONT,
+                      bg=BLACK, fg=WHITE, relief="flat", padx=12, pady=5,
+                      cursor="hand2", command=win.destroy).pack(side="right")
+
+        add_btn.config(command=add_room_window)
 
         btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
                        relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
-        tk.Button(btnFrame, text="✏  Edit",            **btn_cfg).pack(side="right", padx=4)
-        tk.Button(btnFrame, text="⊞  Assign Cleaning",
-                  command=CSassign_window, **btn_cfg).pack(side="right", padx=4)
-        tk.Button(btnFrame, text="🗑  Delete",
+        tk.Button(action_bar, text="✏  Edit",
+                  command=edit_room, **btn_cfg).pack(side="right", padx=4)
+        tk.Button(action_bar, text="⊞  View details",
+                  command=view_room_details, **btn_cfg).pack(side="right", padx=4)
+        tk.Button(action_bar, text="🗑  Delete",
                   bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
                   relief="solid", bd=1, padx=14, pady=5,
-                  cursor="hand2").pack(side="right", padx=4)
+                  cursor="hand2", command=delete_room).pack(side="right", padx=4)
 
-        tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
+        tk.Label(card, text="ⓘ  Click a row to select before editing, viewing details, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8),
                  anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+    
+        self.db.get_all_rooms(self.rooms_tree)
 
-        self.db.get_all_cleaning_staff(self.cleaning_tree)
+    # ── Cleaning page ─────────────────────────────────────────────────
+    def build_cleaning_page(self, page):
+            cs_ID     = tk.StringVar()
+            last      = tk.StringVar()
+            first     = tk.StringVar()
+            mi        = tk.StringVar()
+            email     = tk.StringVar()
+            contact   = tk.StringVar()
+            full_name = tk.StringVar()
 
+            def addCleaningStaff():
+                addStaff = tk.Toplevel()
+                addStaff.title("Add Cleaning Staff")
+                addStaff.config(bg=content_color)
+                addStaff.geometry("500x360")
+                addStaff.resizable(False, False)
+
+                def save_staff():
+                    id_val       = idEntry.get().strip()
+                    last_val     = LN_Entry.get().strip()
+                    first_val    = FN_Entry.get().strip()
+                    mi_val       = MI_Entry.get().strip()
+                    email_val    = emailEntry.get().strip()
+                    contact_val  = contactEntry.get().strip()
+                    fullname_val = f"{last_val}, {first_val} {mi_val}".strip()
+
+                    if not id_val or not last_val or not first_val or not email_val or not contact_val:
+                        messagebox.showerror("Error", "Please fill in all required fields.")
+                        return
+
+                    try:
+                        self.db.insert_cleaning_staff(id_val, last_val, first_val, mi_val, email_val, contact_val, fullname_val)
+                        self.db.get_all_cleaning_staff(self.cleaning_tree)
+                        addStaff.destroy()
+                    except Exception as e:
+                        messagebox.showerror("Database Error", f"Failed to add staff entry:\n{e}")
+
+                upperFrame = tk.Frame(addStaff, bg=content_color)
+                upperFrame.pack(fill="x", padx=15, pady=12)
+                tk.Label(upperFrame, text="Add Cleaning Staff", bg=content_color, fg=FG_DARK,
+                        font=("Segoe UI", 15, "bold")).pack(side="left")
+
+                midFrame = tk.Frame(addStaff, bg=WHITE, padx=15, pady=15,
+                                    bd=1, relief="solid", highlightbackground=BORDER)
+                midFrame.pack(fill="x", padx=15, pady=5)
+                midFrame.columnconfigure(0, weight=2)
+                midFrame.columnconfigure(1, weight=2)
+                midFrame.columnconfigure(2, weight=0)
+
+                tk.Label(midFrame, text="Cleaning Staff ID", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
+                idFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                idFrame.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 15))
+                idEntry = tk.Entry(idFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                relief="flat", bd=0, insertbackground=FG_DARK)
+                idEntry.pack(fill="x", padx=5, pady=4)
+
+                lnGroup = tk.Frame(midFrame, bg=WHITE)
+                lnGroup.grid(row=2, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
+                tk.Label(lnGroup, text="Last Name", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                lnBorder = tk.Frame(lnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                lnBorder.pack(fill="x")
+                LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                LN_Entry.pack(fill="x", padx=5, pady=4)
+
+                fnGroup = tk.Frame(midFrame, bg=WHITE)
+                fnGroup.grid(row=2, column=1, sticky="we", padx=6, pady=(0, 15))
+                tk.Label(fnGroup, text="First Name", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                fnBorder.pack(fill="x")
+                FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                FN_Entry.pack(fill="x", padx=5, pady=4)
+
+                miGroup = tk.Frame(midFrame, bg=WHITE)
+                miGroup.grid(row=2, column=2, sticky="w", padx=(6, 0), pady=(0, 15))
+                tk.Label(miGroup, text="M.I.", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                miBorder.pack()
+                MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK, width=3)
+                MI_Entry.pack(padx=5, pady=4)
+
+                emailGroup = tk.Frame(midFrame, bg=WHITE)
+                emailGroup.grid(row=3, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
+                tk.Label(emailGroup, text="Email", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                emailBorder = tk.Frame(emailGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                emailBorder.pack(fill="x")
+                emailEntry = tk.Entry(emailBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                emailEntry.pack(fill="x", padx=5, pady=4)
+
+                contactGroup = tk.Frame(midFrame, bg=WHITE)
+                contactGroup.grid(row=3, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 15))
+                tk.Label(contactGroup, text="Contact Number", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                contactBorder.pack(fill="x")
+                contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                        relief="flat", bd=0, insertbackground=FG_DARK)
+                contactEntry.pack(fill="x", padx=5, pady=4)
+
+                bottomFrame = tk.Frame(addStaff, bg=content_color)
+                bottomFrame.pack(fill="x", padx=15, pady=15)
+                tk.Button(bottomFrame, text="Add Staff", font=UNIFORM_FONT,
+                        command=save_staff).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
+                        command=addStaff.destroy).pack(side="right")
+
+            def select_record(event):
+                selected = self.cleaning_tree.focus()
+                if selected:
+                    values = self.cleaning_tree.item(selected, "values")
+                    cs_ID.set(values[0])
+                    full_name.set(values[1])
+                    contact.set(values[2])
+                    email.set(values[3])
+
+            def edit_cleaning_stuff():
+                if not self.cleaning_tree.focus():
+                    messagebox.showwarning("Selection Required", "Please click a cleaning staff record from the table first.")
+                    return
+
+                editStaff = tk.Toplevel()
+                editStaff.title("Edit Cleaning Staff")
+                editStaff.config(bg=content_color)
+                editStaff.geometry("500x360")
+                editStaff.resizable(False, False)
+
+                def update_staff():
+                    id_val       = idEntry.get().strip()
+                    last_val     = LN_Entry.get().strip()
+                    first_val    = FN_Entry.get().strip()
+                    mi_val       = MI_Entry.get().strip()
+                    email_val    = emailEntry.get().strip()
+                    contact_val  = contactEntry.get().strip()
+                    fullname_val = f"{last_val}, {first_val} {mi_val}".strip()
+
+                    if not id_val or not last_val or not first_val or not email_val or not contact_val:
+                        messagebox.showerror("Error", "Please fill in all required fields.")
+                        return
+
+                    try:
+                        con = sqlite3.connect(DB_NAME)
+                        cur = con.cursor()
+                        cur.execute(
+                            "UPDATE cleaningStaff SET last_name=?, first_name=?, middle_initial=?, email=?, contact=?, full_name=? WHERE cs_ID=?",
+                                (last_val, first_val, mi_val, email_val, contact_val, fullname_val, id_val)
+                        )
+                        con.commit()
+                        con.close()
+                        self.db.get_all_cleaning_staff(self.cleaning_tree)
+                        load_data()
+                        clear_fields()
+                        editStaff.destroy()
+                    except Exception as e:
+                        messagebox.showerror("Database Modification Error", 
+                                            f"Failed execution block.\nCheck if 'edit_cleaning_stuff' matches your helper method name exactly.\n\nError details: {e}")
+
+                upperFrame = tk.Frame(editStaff, bg=content_color)
+                upperFrame.pack(fill="x", padx=15, pady=12)
+                tk.Label(upperFrame, text="Edit Cleaning Staff", bg=content_color, fg=FG_DARK,
+                        font=("Segoe UI", 15, "bold")).pack(side="left")
+
+                midFrame = tk.Frame(editStaff, bg=WHITE, padx=15, pady=15,
+                                    bd=1, relief="solid", highlightbackground=BORDER)
+                midFrame.pack(fill="x", padx=15, pady=5)
+                midFrame.columnconfigure(0, weight=2)
+                midFrame.columnconfigure(1, weight=2)
+                midFrame.columnconfigure(2, weight=0)
+
+                tk.Label(midFrame, text="Cleaning Staff ID", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
+                idFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                idFrame.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 15))
+                
+                idEntry = tk.Entry(idFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                idEntry.pack(fill="x", padx=5, pady=4)
+                idEntry.insert(0, cs_ID.get())
+
+                raw_name = full_name.get()
+                last_name_segment = ""
+                first_name_segment = ""
+                mi_segment = ""
+                
+                if "," in raw_name:
+                    last_name_segment, rest = raw_name.split(",", 1)
+                    rest = rest.strip()
+                    if " " in rest:
+                        parts = rest.split(" ")
+                        mi_segment = parts[-1]
+                        first_name_segment = " ".join(parts[:-1])
+                    else:
+                        first_name_segment = rest
+
+                lnGroup = tk.Frame(midFrame, bg=WHITE)
+                lnGroup.grid(row=2, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
+                tk.Label(lnGroup, text="Last Name", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                lnBorder = tk.Frame(lnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                lnBorder.pack(fill="x")
+                LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                LN_Entry.pack(fill="x", padx=5, pady=4)
+                LN_Entry.insert(0, last_name_segment.strip())
+
+                fnGroup = tk.Frame(midFrame, bg=WHITE)
+                fnGroup.grid(row=2, column=1, sticky="we", padx=6, pady=(0, 15))
+                tk.Label(fnGroup, text="First Name", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                fnBorder.pack(fill="x")
+                FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                FN_Entry.pack(fill="x", padx=5, pady=4)
+                FN_Entry.insert(0, first_name_segment.strip())
+
+                miGroup = tk.Frame(midFrame, bg=WHITE)
+                miGroup.grid(row=2, column=2, sticky="w", padx=(6, 0), pady=(0, 15))
+                tk.Label(miGroup, text="M.I.", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                miBorder.pack()
+                MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0, width=3)
+                MI_Entry.pack(padx=5, pady=4)
+                MI_Entry.insert(0, mi_segment.strip())
+
+                emailGroup = tk.Frame(midFrame, bg=WHITE)
+                emailGroup.grid(row=3, column=0, sticky="we", padx=(0, 6), pady=(0, 15))
+                tk.Label(emailGroup, text="Email", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                emailBorder = tk.Frame(emailGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                emailBorder.pack(fill="x")
+                emailEntry = tk.Entry(emailBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                emailEntry.pack(fill="x", padx=5, pady=4)
+                emailEntry.insert(0, email.get())
+
+                contactGroup = tk.Frame(midFrame, bg=WHITE)
+                contactGroup.grid(row=3, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 15))
+                tk.Label(contactGroup, text="Contact Number", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                contactBorder.pack(fill="x")
+                contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT, relief="flat", bd=0)
+                contactEntry.pack(fill="x", padx=5, pady=4)
+                contactEntry.insert(0, contact.get())
+
+                bottomFrame = tk.Frame(editStaff, bg=content_color)
+                bottomFrame.pack(fill="x", padx=15, pady=15)
+                tk.Button(bottomFrame, text="Save Changes", font=UNIFORM_FONT,
+                        command=update_staff).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
+                        command=editStaff.destroy).pack(side="right")
+
+            def load_data():
+                for row in self.cleaning_tree.get_children():
+                    self.cleaning_tree.delete(row)
+                self.db.get_all_cleaning_staff(self.cleaning_tree)
+
+            def clear_fields():
+                cs_ID.set("")
+                last.set("")
+                first.set("")
+                mi.set("")
+                email.set("")
+                contact.set("")
+                full_name.set("")
+                
+            def delete_cleaning_staff():
+                selected_id = cs_ID.get()
+                if not selected_id:
+                    messagebox.showwarning("Selection Required", "Please click a cleaning staff record from the table first.")
+                    return
+                    
+                confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to permanently delete Staff ID: {selected_id}?")
+                if confirm:
+                    try:
+                        con = sqlite3.connect(DB_NAME)
+                        cur = con.cursor()
+                        cur.execute("DELETE FROM cleaningStaff WHERE cs_ID=?", (cs_ID.get(),))
+                        con.commit()
+                        con.close()
+                        load_data()
+                        clear_fields()
+                    except Exception as e:
+                        messagebox.showerror("Database Error", f"Failed to execute row deletion:\n{e}")
+
+            def CSassign_window():
+                assign = tk.Toplevel()
+                assign.title("Assign Cleaning")
+                assign.config(bg=content_color)
+                assign.geometry("420x360")
+                assign.resizable(False, False)
+
+                upperFrame = tk.Frame(assign, bg=content_color)
+                upperFrame.pack(fill="x", padx=15, pady=12)
+                tk.Label(upperFrame, text="Assign Cleaning", bg=content_color, fg=FG_DARK,
+                        font=("Segoe UI", 15, "bold")).pack(side="left")
+
+                midFrame = tk.Frame(assign, bg=WHITE, padx=15, pady=15,
+                                    bd=1, relief="solid", highlightbackground=BORDER)
+                midFrame.pack(fill="both", expand=True, padx=15, pady=5)
+                midFrame.columnconfigure(0, weight=1)
+                midFrame.columnconfigure(1, weight=1)
+
+                tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2))
+                roomSelection = tk.StringVar()
+                roomOptions = ["Option 1", "Option 2", "Option 3"]
+                roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=roomOptions,
+                                            state="readonly", font=UNIFORM_FONT)
+                roomDropdown.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 12))
+                roomDropdown.current(0)
+
+                tk.Label(midFrame, text="Date", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 2))
+                searchFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                searchFrame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 12))
+                dateEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                dateEntry.pack(fill="x", padx=5, pady=3)
+
+                timeStartFrame = tk.Frame(midFrame, bg=WHITE)
+                timeStartFrame.grid(row=4, column=0, sticky="we", padx=(0, 8))
+                tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                tStartBorder = tk.Frame(timeStartFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                tStartBorder.pack(fill="x")
+                timeStartEntry = tk.Entry(tStartBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                        relief="flat", bd=0)
+                timeStartEntry.pack(fill="x", padx=5, pady=3)
+
+                timeEndFrame = tk.Frame(midFrame, bg=WHITE)
+                timeEndFrame.grid(row=4, column=1, sticky="we", padx=(8, 0))
+                tk.Label(timeEndFrame, text="Time End", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                tEndBorder = tk.Frame(timeEndFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                tEndBorder.pack(fill="x")
+                timeEndEntry = tk.Entry(tEndBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                        relief="flat", bd=0)
+                timeEndEntry.pack(fill="x", padx=5, pady=3)
+
+                bottomFrame = tk.Frame(assign, bg=content_color)
+                bottomFrame.pack(fill="x", padx=15, pady=15)
+                tk.Button(bottomFrame, text="Save Schedule",
+                        font=UNIFORM_FONT).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Cancel", fg="#c0392b",
+                        font=UNIFORM_FONT).pack(side="right")
+
+            # ── Top bar ───────────────────────────────────────────────────
+            upperFrame = tk.Frame(page, bg=content_color)
+            upperFrame.pack(fill="x", padx=28, pady=(20, 12))
+            tk.Label(upperFrame, text="Cleaning Staff", bg=content_color, fg=FG_DARK,
+                    font=("Segoe UI", 17, "bold")).pack(side="left")
+            tk.Button(upperFrame, text="+ Add Staff", command=addCleaningStaff,
+                    bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT, relief="solid", bd=1,
+                    padx=12, pady=5, cursor="hand2").pack(side="right")
+
+            # ── Card ──────────────────────────────────────────────────────
+            card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
+
+            searchFrame = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            searchFrame.pack(fill="x", padx=16, pady=(14, 10))
+            tk.Label(searchFrame, text="🔍", bg=WHITE, fg=FG_MUTED,
+                    font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+            CSsearchEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK,
+                                    font=UNIFORM_FONT, relief="flat", bd=0,
+                                    insertbackground=FG_DARK)
+            CSsearchEntry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+            style = ttk.Style()
+            style.theme_use("clam")
+            style.configure("CleaningStaff.Treeview", background=WHITE, foreground=FG_DARK,
+                            rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
+            style.configure("CleaningStaff.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+                            font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
+            style.map("CleaningStaff.Treeview",
+                    background=[("selected", ROW_SEL)],
+                    foreground=[("selected", FG_DARK)])
+            style.layout("CleaningStaff.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+            tree_frame = tk.Frame(card, bg=WHITE)
+            tree_frame.pack(fill="both", expand=True, padx=16)
+
+            self.cleaning_tree = ttk.Treeview(tree_frame,
+                                            columns=("CS_ID", "CS_NAME", "CS_CONTACT", "CS_EMAIL"),
+                                            show="headings",
+                                            style="CleaningStaff.Treeview")
+            self.cleaning_tree.heading("CS_ID",      text="Staff ID")
+            self.cleaning_tree.heading("CS_NAME",    text="Name")
+            self.cleaning_tree.heading("CS_CONTACT", text="Contact")
+            self.cleaning_tree.heading("CS_EMAIL",   text="Email")
+            self.cleaning_tree.column("CS_ID",      width=80)
+            self.cleaning_tree.column("CS_NAME",    width=200)
+            self.cleaning_tree.column("CS_CONTACT", width=300)
+            self.cleaning_tree.column("CS_EMAIL",   width=300)
+
+            scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.cleaning_tree.yview)
+            self.cleaning_tree.configure(yscrollcommand=scrollbar.set)
+            scrollbar.pack(side="right", fill="y")
+            self.cleaning_tree.pack(side="left", fill="both", expand=True)
+
+            # Connect event to selection processor function
+            self.cleaning_tree.bind("<ButtonRelease-1>", select_record)
+
+            tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(6, 0))
+
+            btnFrame = tk.Frame(card, bg=WHITE)
+            btnFrame.pack(fill="x", padx=16, pady=10)
+
+            btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+                        relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+            tk.Button(btnFrame, text="✏  Edit", command=edit_cleaning_stuff,
+                    **btn_cfg).pack(side="right", padx=4)
+            tk.Button(btnFrame, text="⊞  Assign Cleaning",
+                    command=CSassign_window, **btn_cfg).pack(side="right", padx=4)
+            tk.Button(btnFrame, text="🗑  Delete", command=delete_cleaning_staff,
+                    bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
+                    relief="solid", bd=1, padx=14, pady=5,
+                    cursor="hand2").pack(side="right", padx=4)
+
+            tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
+                    bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8),
+                    anchor="w").pack(fill="x", padx=20, pady=(0, 10))
+
+            self.db.get_all_cleaning_staff(self.cleaning_tree)
     # ── Settings page ─────────────────────────────────────────────────
     def build_settings_page(self, page):
         tk.Label(page, text="FOR LOG OUT AND USER MANAGEMENT", bg=content_color,
