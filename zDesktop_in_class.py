@@ -1,6 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import INSERT, messagebox
+from tkinter import messagebox
 import sqlite3
 
 UNIFORM_FONT = ("Segoe UI", 10)
@@ -1791,9 +1791,129 @@ class main(tk.Tk):
             self.db.get_all_cleaning_staff(self.cleaning_tree)
     # ── Settings page ─────────────────────────────────────────────────
     def build_settings_page(self, page):
-        tk.Label(page, text="FOR LOG OUT AND USER MANAGEMENT", bg=content_color,
-                 fg=font_color_sidebar, font=("Arial", 16, "bold")).pack(pady=20)
+        # ── Top bar ───────────────────────────────────────────────────────
+        topbar = tk.Frame(page, bg=content_color)
+        topbar.pack(fill="x", padx=28, pady=(20, 12))
+        tk.Label(topbar, text="Settings", bg=content_color, fg=FG_DARK,
+                font=("Segoe UI", 17, "bold")).pack(side="left")
 
+        # ── Card ──────────────────────────────────────────────────────────
+        card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
+
+        # ── Section title ─────────────────────────────────────────────────
+        tk.Label(card, text="Admin Accounts", bg=WHITE, fg=FG_DARK,
+                font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16)
+
+        # ── Treeview ──────────────────────────────────────────────────────
+        tree_frame = tk.Frame(card, bg=WHITE)
+        tree_frame.pack(fill="both", expand=True, padx=16, pady=(10, 0))
+
+        style = ttk.Style()
+        style.configure("Settings.Treeview", background=WHITE, foreground=FG_DARK,
+                        rowheight=34, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
+        style.configure("Settings.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+                        font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
+        style.map("Settings.Treeview",
+                background=[("selected", ROW_SEL)],
+                foreground=[("selected", FG_DARK)])
+        style.layout("Settings.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+        self.settings_tree = ttk.Treeview(tree_frame, columns=("username", "password"),
+                                        show="headings", style="Settings.Treeview",
+                                        selectmode="browse", height=6)
+        self.settings_tree.heading("username", text="Username", anchor="w")
+        self.settings_tree.heading("password", text="Password", anchor="w")
+        self.settings_tree.column("username", width=220, anchor="w", stretch=True)
+        self.settings_tree.column("password", width=220, anchor="w", stretch=True)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.settings_tree.yview)
+        self.settings_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.settings_tree.pack(side="left", fill="both", expand=True)
+
+        # ── Entry fields ──────────────────────────────────────────────────
+        fields_frame = tk.Frame(card, bg=WHITE)
+        fields_frame.pack(fill="x", padx=16, pady=(14, 0))
+        fields_frame.columnconfigure(0, weight=1)
+        fields_frame.columnconfigure(1, weight=1)
+
+        tk.Label(fields_frame, text="Username", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+        tk.Label(fields_frame, text="Password", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
+
+        user_border = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        user_border.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+        user_entry = tk.Entry(user_border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                            relief="flat", bd=0, insertbackground=FG_DARK)
+        user_entry.pack(fill="x", padx=5, pady=4)
+
+        pass_border = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        pass_border.grid(row=1, column=1, sticky="we", pady=(0, 12))
+        pass_entry = tk.Entry(pass_border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                            relief="flat", bd=0, insertbackground=FG_DARK, show="*")
+        pass_entry.pack(fill="x", padx=5, pady=4)
+
+        # ── Populate entries on row select ────────────────────────────────
+        def on_select(event):
+            selected = self.settings_tree.focus()
+            if selected:
+                values = self.settings_tree.item(selected, "values")
+                user_entry.delete(0, "end")
+                pass_entry.delete(0, "end")
+                user_entry.insert(0, values[0])
+                pass_entry.insert(0, values[1])
+
+        self.settings_tree.bind("<ButtonRelease-1>", on_select)
+
+        # ── Action buttons ────────────────────────────────────────────────
+        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(0, 0))
+
+        btn_bar = tk.Frame(card, bg=WHITE)
+        btn_bar.pack(fill="x", padx=16, pady=10)
+
+        def add_user():
+            username = user_entry.get().strip()
+            password = pass_entry.get().strip()
+            if not username or not password:
+                return
+            self.settings_tree.insert("", "end", values=(username, password))
+            user_entry.delete(0, "end")
+            pass_entry.delete(0, "end")
+
+        def edit_user():
+            selected = self.settings_tree.focus()
+            if not selected:
+                return
+            username = user_entry.get().strip()
+            password = pass_entry.get().strip()
+            if not username or not password:
+                return
+            self.settings_tree.item(selected, values=(username, password))
+
+        def delete_user():
+            selected = self.settings_tree.focus()
+            if not selected:
+                return
+            self.settings_tree.delete(selected)
+            user_entry.delete(0, "end")
+            pass_entry.delete(0, "end")
+
+        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+                    relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+        tk.Button(btn_bar, text="＋  Add",    command=add_user,    **btn_cfg).pack(side="left", padx=(0, 6))
+        tk.Button(btn_bar, text="✏  Edit",   command=edit_user,   **btn_cfg).pack(side="left", padx=6)
+        tk.Button(btn_bar, text="🗑  Delete", command=delete_user,
+                bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
+                relief="solid", bd=1, padx=14, pady=5,
+                cursor="hand2").pack(side="left", padx=6)
+        
+        tk.Button(btn_bar, text="⏻  Log Out",
+                bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
+                relief="flat", padx=14, pady=5, cursor="hand2",
+                command=self.destroy).pack(side="right")
 
 if __name__ == "__main__":
     app = main()
