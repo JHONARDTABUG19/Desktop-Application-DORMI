@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
 from PIL import Image, ImageTk
-from Main_Page import main
+from zDesktop_in_class import main
 import sqlite3
 import sys
 import os
