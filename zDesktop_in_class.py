@@ -24,6 +24,25 @@ DB_NAME = "dorm_management.db"
 
 class Database:
 
+    def for_dashboard(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT COUNT(*) FROM students")
+            total_students = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM rooms")
+            total_rooms = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM rooms WHERE occupants > 0")
+            rooms_occupied = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM cleaningStaff")
+            total_cleaning_tasks = cursor.fetchone()[0]
+
+            return total_students, total_rooms, rooms_occupied, total_cleaning_tasks
+        
+    
+
     def create_student_table(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -40,6 +59,7 @@ class Database:
                 )
             """)
             connect.commit()
+            
 
     def add_student(self, student_no, last, first, mi, program, status, contact):
         with sqlite3.connect(DB_NAME) as connect:
@@ -49,6 +69,8 @@ class Database:
                 (student_no, last, first, mi, program, status, contact)
             )
             connect.commit()
+
+            
 
     def get_all_students(self, tree):
         for row in tree.get_children():
@@ -195,10 +217,13 @@ class main(tk.Tk):
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
         
+        
+        
         self.all_pages   = []
         self.all_buttons = []
 
         self.main_build_layout()
+        self.refresh_dashboard()
 
     # ── Layout ────────────────────────────────────────────────────────
     def main_build_layout(self):
@@ -283,6 +308,15 @@ class main(tk.Tk):
         self.Settings.config(       command=lambda: self.show_page(self.settings_page,  self.Settings))
 
         self.show_page(self.dashboard_page, self.dashboardButton)
+    
+    #updating dashboard numbers after changes in students and rooms pages
+    def refresh_dashboard(self):                          
+            ts, tr, tro, tc = self.db.for_dashboard()
+            print(ts, tr, tro, tc)           
+            self.tsNum.config(text=str(ts))
+            self.trNum.config(text=str(tr))
+            self.troNum.config(text=str(tro))
+            self.tcNum.config(text=str(tc))
 
     # ── Navigation ────────────────────────────────────────────────────
     def show_page(self, page, active_btn):
@@ -304,6 +338,7 @@ class main(tk.Tk):
         totalstudents_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalstudents_Lframe.pack(side="left", padx=(0, 10), fill="x", expand=True)
         totalstudents_Lframe.pack_propagate(False)
+
         tk.Label(totalstudents_Lframe, text="🧑", font=("Arial", 24),
                  bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
         self.tsNum = tk.Label(totalstudents_Lframe, text="0",
@@ -315,6 +350,7 @@ class main(tk.Tk):
         totalrooms_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalrooms_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalrooms_Lframe.pack_propagate(False)
+
         tk.Label(totalrooms_Lframe, text="🛏️", font=("Arial", 24),
                  bg="white", fg="Green").pack(anchor="w", padx=10, pady=5)
         self.trNum = tk.Label(totalrooms_Lframe, text="0",
@@ -326,6 +362,7 @@ class main(tk.Tk):
         totalroomsoccupied_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalroomsoccupied_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalroomsoccupied_Lframe.pack_propagate(False)
+
         tk.Label(totalroomsoccupied_Lframe, text="🛏️", font=("Arial", 24),
                  bg="white", fg="violet").pack(anchor="w", padx=10, pady=5)
         self.troNum = tk.Label(totalroomsoccupied_Lframe, text="0",
@@ -337,6 +374,7 @@ class main(tk.Tk):
         totalcleaning_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
         totalcleaning_Lframe.pack(side="left", padx=(10, 0), fill="x", expand=True)
         totalcleaning_Lframe.pack_propagate(False)
+
         tk.Label(totalcleaning_Lframe, text="🧹", font=("Arial", 24),
                  bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
         self.tcNum = tk.Label(totalcleaning_Lframe, text="0",
@@ -499,6 +537,7 @@ class main(tk.Tk):
                     self.tree.insert("", "end", values=(no, full_name, program, "", status, contact))
 
                 update_count()
+                self.refresh_dashboard()
                 win.destroy()
 
             bottomFrame = tk.Frame(win, bg=content_color)
@@ -516,8 +555,11 @@ class main(tk.Tk):
                 messagebox_info("Select a student first.", "No Selection")
                 return
             if messagebox_confirm("Delete this student? This cannot be undone."):
+                student_no = self.tree.item(selected[0], "values")[0]  
+                self.db.delete_student(student_no)                     
                 self.tree.delete(selected[0])
                 update_count()
+                self.refresh_dashboard()
 
         def edit_student():
             selected = self.tree.selection()
@@ -866,6 +908,7 @@ class main(tk.Tk):
                 # always re-fetch from DB to stay in sync
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
+                self.refresh_dashboard()
                 win.destroy()
 
             upperFrame = tk.Frame(win, bg=content_color)
@@ -967,6 +1010,7 @@ class main(tk.Tk):
                 self.db.delete_room(room_id)
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
+                self.refresh_dashboard()
 
         def edit_room():
             selected = self.rooms_tree.selection()
@@ -1005,11 +1049,12 @@ class main(tk.Tk):
 
             fields = [
                 ("Room Number",  values[0]),
-                ("Room Type",    values[1]),
-                ("Capacity",     values[2]),
-                ("Occupants",    values[3]),
-                ("Status",       values[4]),
-                ("Last Cleaned", values[5]),
+                ("Building",     values[1]),
+                ("Room Type",    values[2]),
+                ("Capacity",     values[3]),
+                ("Occupants",    values[4]),
+                ("Status",       values[5]),
+                ("Last Cleaned", values[6]),
             ]
             for i, (label, value) in enumerate(fields):
                 tk.Label(midFrame, text=label, bg=WHITE, fg=FG_MUTED,
@@ -1076,6 +1121,7 @@ class main(tk.Tk):
                     try:
                         self.db.insert_cleaning_staff(id_val, last_val, first_val, mi_val, email_val, contact_val, fullname_val)
                         self.db.get_all_cleaning_staff(self.cleaning_tree)
+                        self.refresh_dashboard()
                         addStaff.destroy()
                     except Exception as e:
                         messagebox.showerror("Database Error", f"Failed to add staff entry:\n{e}")
@@ -1326,6 +1372,7 @@ class main(tk.Tk):
                         con.close()
                         load_data()
                         clear_fields()
+                        self.refresh_dashboard()
                     except Exception as e:
                         messagebox.showerror("Database Error", f"Failed to execute row deletion:\n{e}")
 
