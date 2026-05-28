@@ -537,7 +537,7 @@ class main(tk.Tk):
             win = tk.Toplevel()
             win.title("Assign Room")
             win.config(bg=content_color)
-            win.geometry("360x260")
+            win.geometry("360x320")
             win.resizable(False, False)
             win.grab_set()
 
@@ -1385,12 +1385,58 @@ class main(tk.Tk):
                                         relief="flat", bd=0)
                 timeEndEntry.pack(fill="x", padx=5, pady=3)
 
+                err_label = tk.Label(assign, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
+                err_label.pack()
+
+                def confirm_assign():
+                    room  = roomSelection.get().strip()
+                    date  = dateEntry.get().strip()
+                    t_start = timeStartEntry.get().strip()
+                    t_end   = timeEndEntry.get().strip()
+
+                    if not room:
+                        err_label.config(text="Please select a room.")
+                        return
+                    if not date:
+                        err_label.config(text="Please enter a date.")
+                        return
+                    if not t_start or not t_end:
+                        err_label.config(text="Please enter both start and end times.")
+                        return
+
+                    try:
+                        con = sqlite3.connect(DB_NAME)
+                        cur = con.cursor()
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS cleaning_schedule (
+                                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                                cs_ID     VARCHAR(255),
+                                room      VARCHAR(255),
+                                date      VARCHAR(255),
+                                time_start VARCHAR(255),
+                                time_end  VARCHAR(255)
+                            )
+                        """)
+                        cur.execute(
+                            "INSERT INTO cleaning_schedule (cs_ID, room, date, time_start, time_end) VALUES (?, ?, ?, ?, ?)",
+                            (cs_ID.get(), room, date, t_start, t_end)
+                        )
+                        con.commit()
+                        con.close()
+                        messagebox.showinfo("Success", "Cleaning schedule assigned successfully.")
+                        assign.destroy()
+                    except Exception as e:
+                        err_label.config(text=f"Error: {e}")
+
                 bottomFrame = tk.Frame(assign, bg=content_color)
                 bottomFrame.pack(fill="x", padx=15, pady=15)
-                tk.Button(bottomFrame, text="Save Schedule",
-                        font=UNIFORM_FONT).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Confirm",
+                        font=UNIFORM_FONT, bg=BLACK, fg=WHITE, relief="flat",
+                        padx=12, pady=5, cursor="hand2",
+                        command=confirm_assign).pack(side="right", padx=(5, 0))
                 tk.Button(bottomFrame, text="Cancel", fg="#c0392b",
-                        font=UNIFORM_FONT).pack(side="right")
+                        font=UNIFORM_FONT, relief="flat", padx=12, pady=5,
+                        cursor="hand2", command=assign.destroy).pack(side="right")
 
             # ── Top bar ───────────────────────────────────────────────────
             upperFrame = tk.Frame(page, bg=content_color)
