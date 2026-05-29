@@ -5,6 +5,7 @@ from zDesktop_in_class import main
 import sqlite3
 import sys
 import os
+import hashlib
 
 def resource_path(relative_path):
     """Get the correct path whether running as script or .exe"""
@@ -13,7 +14,6 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     # running normally as .py
     return os.path.join(os.path.abspath("."), relative_path)
-
 
 
 def create_table_for_login():
@@ -27,13 +27,23 @@ def create_table_for_login():
         password VARCHAR(255) NOT NULL)
     """)
 
+    password_plain = "admin123"
+    password_hash_ver = hashlib.sha256(password_plain.encode()).hexdigest()
+
+    # eto 'yung pag naka hash na agad para hindi na naka hardcode 'yung admin123.
+    # i comment niyo na lang 'yung password_plain and alisin niyo as comment 'yung sa baba para ma-try niyo
+    # password_hash_ver = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
+
     cursor.execute("""
     INSERT OR IGNORE INTO Admin (username, password)
-    VALUES (?, ?)""", ("admin", "admin123"))
+    VALUES (?, ?)""", ("admin", password_hash_ver))
+
+    cursor.execute("""
+    UPDATE Admin SET password = ? WHERE username = ? AND length(password) != 64
+    """, (password_hash_ver, "admin"))
 
     connect.commit()
     connect.close()
-
 
 
 def login_page(): 
@@ -43,8 +53,8 @@ def login_page():
       create_table_for_login()
       
       def login_action():
-        username = username_entry.get()
-        password = password_entry.get()
+        username = username_entry.get().strip()
+        password = password_entry.get().strip()
 
         if check_login_entry(username, password):
             messagebox.showinfo("Success", "Login Successful")
@@ -56,10 +66,14 @@ def login_page():
       def check_login_entry(username, password):
             connect = sqlite3.connect(DB_NAME)
             cursor = connect.cursor()
+            
+            input_password_hash = hashlib.sha256(password.encode()).hexdigest()
+            
             cursor.execute(
-                  "SELECT * FROM Admin WHERE USERNAME=? AND PASSWORD=?", (username, password))
+                  "SELECT * FROM Admin WHERE username=? AND password=?", (username, input_password_hash))
             result = cursor.fetchone()
             connect.close()
+            
             return result is not None
 
 
@@ -113,10 +127,4 @@ def login_page():
       root.mainloop()
 
 
-      
 login_page()
-
-
-
-
-
