@@ -31,6 +31,7 @@ def create_table_for_login():
     password_hash_ver = hashlib.sha256(password_plain.encode()).hexdigest()
 
     # eto 'yung pag naka hash na agad para hindi na naka hardcode 'yung admin123.
+    # i comment niyo na lang 'yung password_plain and alisin niyo as comment 'yung sa baba para ma-try niyo
     # password_hash_ver = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
 
     cursor.execute("""
