@@ -683,15 +683,40 @@ class main(tk.Tk):
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-        search_wrap = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        search_wrap.pack(fill="x", padx=16, pady=(14, 10))
-        tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
-                 font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+        filter_bar_students = tk.Frame(card, bg=WHITE)
+        filter_bar_students.pack(fill="x", padx=16, pady=(14, 10))
+
+        # ── Search field ──────────────────────────────────────────────────────
+
+        search_wrap_students = tk.Frame(filter_bar_students, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
+                font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+        search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                 font=UNIFORM_FONT, relief="flat", bd=0,
                                 insertbackground=FG_DARK)
-        search_entry.insert(0, "Search by name or student number...")
+        search_entry.insert(0, "Search by ID or Name...")
         search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        # ── Search button ─────────────────────────────────────────────────────
+        tk.Button(filter_bar_students, text="Search", fg="BLACK", bg=content_color,
+                  font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                  cursor="hand2").pack(side="left", padx=(0, 16))
+
+        # ── Sort filter ─────────────────────────────────────────────────────
+        tk.Label(filter_bar_students, text="Sort By:", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
+        course_var = tk.StringVar(value="")
+        course_drop = ttk.Combobox(filter_bar_students, textvariable=course_var,
+                                values=["Name", "Course", "Room"],
+                                state="readonly", font=UNIFORM_FONT, width=10)
+        course_drop.pack(side="left", padx=(0, 12))
+        
+        # ── Apply Filters button ──────────────────────────────────────────────
+        tk.Button(filter_bar_students, text="Apply", fg="BLACK", bg=content_color,
+                font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                cursor="hand2").pack(side="left")
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -811,15 +836,42 @@ class main(tk.Tk):
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-        search_wrap = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        search_wrap.pack(fill="x", padx=16, pady=(14, 10))
-        tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
-                 font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+        #start of filter frame
+
+        filter_bar_rooms = tk.Frame(card, bg=WHITE)
+        filter_bar_rooms.pack(fill="x", padx=16, pady=(14, 10))
+
+        search_wrap_students = tk.Frame(filter_bar_rooms, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
+                font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+        search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                 font=UNIFORM_FONT, relief="flat", bd=0,
                                 insertbackground=FG_DARK)
-        search_entry.insert(0, "Search by room number or type...")
+        search_entry.insert(0, "Search by ID or Name...")
         search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        # ── Search button ─────────────────────────────────────────────────────
+        tk.Button(filter_bar_rooms, text="Search", fg="BLACK", bg=content_color,
+                  font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                  cursor="hand2").pack(side="left", padx=(0, 16))
+
+        # ── Sort filter ─────────────────────────────────────────────────────
+        tk.Label(filter_bar_rooms, text="Sort By:", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
+        course_var = tk.StringVar(value="")
+        course_drop = ttk.Combobox(filter_bar_rooms, textvariable=course_var,
+                                values=["Name", "Course", "Room"],
+                                state="readonly", font=UNIFORM_FONT, width=10)
+        course_drop.pack(side="left", padx=(0, 12))
+        
+        # ── Apply Filters button ──────────────────────────────────────────────
+        tk.Button(filter_bar_rooms, text="Apply", fg="BLACK", bg=content_color,
+                font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                cursor="hand2").pack(side="left")
+        
+        #end of frame of filters
 
         filter_frame = tk.Frame(card, bg=WHITE)
         filter_frame.pack(fill="x", padx=16, pady=(0, 8))
@@ -1498,14 +1550,42 @@ class main(tk.Tk):
             card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
             card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-            searchFrame = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            searchFrame.pack(fill="x", padx=16, pady=(14, 10))
-            tk.Label(searchFrame, text="🔍", bg=WHITE, fg=FG_MUTED,
+            #start of filter frame
+
+            filter_bar_staff = tk.Frame(card, bg=WHITE)
+            filter_bar_staff.pack(fill="x", padx=16, pady=(14, 10))
+
+            search_wrap_students = tk.Frame(filter_bar_staff, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+            tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
                     font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-            CSsearchEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK,
+            search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                     font=UNIFORM_FONT, relief="flat", bd=0,
                                     insertbackground=FG_DARK)
-            CSsearchEntry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+            search_entry.insert(0, "Search by ID or Name...")
+            search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+            # ── Search button ─────────────────────────────────────────────────────
+            tk.Button(filter_bar_staff, text="Search", fg="BLACK", bg=content_color,
+                    font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                    cursor="hand2").pack(side="left", padx=(0, 16))
+
+            # ── Sort filter ─────────────────────────────────────────────────────
+            tk.Label(filter_bar_staff, text="Sort By:", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
+            course_var = tk.StringVar(value="")
+            course_drop = ttk.Combobox(filter_bar_staff, textvariable=course_var,
+                                    values=["Name", "Course", "Room"],
+                                    state="readonly", font=UNIFORM_FONT, width=10)
+            course_drop.pack(side="left", padx=(0, 12))
+            
+            # ── Apply Filters button ──────────────────────────────────────────────
+            tk.Button(filter_bar_staff, text="Apply", fg="BLACK", bg=content_color,
+                    font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                    cursor="hand2").pack(side="left")
+            
+            #end of frame of filters
 
             style = ttk.Style()
             style.theme_use("clam")
