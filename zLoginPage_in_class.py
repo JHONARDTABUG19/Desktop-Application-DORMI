@@ -3,7 +3,17 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 from zDesktop_in_class import main
 import sqlite3
+import sys
+import os
+import hashlib
 
+def resource_path(relative_path):
+    """Get the correct path whether running as script or .exe"""
+    if hasattr(sys, '_MEIPASS'):
+        # running as .exe — PyInstaller extracts files here
+        return os.path.join(sys._MEIPASS, relative_path)
+    # running normally as .py
+    return os.path.join(os.path.abspath("."), relative_path)
 
 
 def create_table_for_login():
@@ -17,13 +27,19 @@ def create_table_for_login():
         password VARCHAR(255) NOT NULL)
     """)
 
+    default_password_plain = "admin123"
+    default_password_hash = hashlib.sha256(default_password_plain.encode()).hexdigest()
+
     cursor.execute("""
     INSERT OR IGNORE INTO Admin (username, password)
-    VALUES (?, ?)""", ("admin", "admin123"))
+    VALUES (?, ?)""", ("admin", default_password_hash))
+
+    cursor.execute("""
+    UPDATE Admin SET password = ? WHERE username = ? AND length(password) != 64
+    """, (default_password_hash, "admin"))
 
     connect.commit()
     connect.close()
-
 
 
 def login_page(): 
@@ -33,8 +49,8 @@ def login_page():
       create_table_for_login()
       
       def login_action():
-        username = username_entry.get()
-        password = password_entry.get()
+        username = username_entry.get().strip()
+        password = password_entry.get().strip()
 
         if check_login_entry(username, password):
             messagebox.showinfo("Success", "Login Successful")
@@ -46,10 +62,14 @@ def login_page():
       def check_login_entry(username, password):
             connect = sqlite3.connect(DB_NAME)
             cursor = connect.cursor()
+            
+            input_password_hash = hashlib.sha256(password.encode()).hexdigest()
+            
             cursor.execute(
-                  "SELECT * FROM Admin WHERE USERNAME=? AND PASSWORD=?", (username, password))
+                  "SELECT * FROM Admin WHERE username=? AND password=?", (username, input_password_hash))
             result = cursor.fetchone()
             connect.close()
+            
             return result is not None
 
 
@@ -67,7 +87,7 @@ def login_page():
       frame.place(relx=0.5, rely=0.5, anchor=CENTER, width=960, height=440)
 
       # ── Left: Image ───────────────────────────────────────────────
-      img_raw = Image.open("dormyz.png")
+      img_raw = Image.open(resource_path("dormyz.png"))
       img_raw = img_raw.resize((600, 440))
       img = ImageTk.PhotoImage(img_raw)
 
@@ -103,10 +123,4 @@ def login_page():
       root.mainloop()
 
 
-      
 login_page()
-
-
-
-
-
