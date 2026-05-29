@@ -862,7 +862,7 @@ class main(tk.Tk):
                 font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
         course_var = tk.StringVar(value="")
         course_drop = ttk.Combobox(filter_bar_rooms, textvariable=course_var,
-                                values=["Name", "Course", "Room"],
+                                values=["Room No.","Building", "Occupants"],
                                 state="readonly", font=UNIFORM_FONT, width=10)
         course_drop.pack(side="left", padx=(0, 12))
         
@@ -1576,7 +1576,7 @@ class main(tk.Tk):
                     font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
             course_var = tk.StringVar(value="")
             course_drop = ttk.Combobox(filter_bar_staff, textvariable=course_var,
-                                    values=["Name", "Course", "Room"],
+                                    values=["Name", "Rooms"],
                                     state="readonly", font=UNIFORM_FONT, width=10)
             course_drop.pack(side="left", padx=(0, 12))
             
