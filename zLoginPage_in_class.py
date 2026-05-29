@@ -27,16 +27,19 @@ def create_table_for_login():
         password VARCHAR(255) NOT NULL)
     """)
 
-    default_password_plain = "admin123"
-    default_password_hash = hashlib.sha256(default_password_plain.encode()).hexdigest()
+    password_plain = "admin123"
+    password_hash_ver = hashlib.sha256(password_plain.encode()).hexdigest()
+
+    # eto 'yung pag naka hash na agad para hindi na naka hardcode 'yung admin123.
+    # password_hash_ver = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
 
     cursor.execute("""
     INSERT OR IGNORE INTO Admin (username, password)
-    VALUES (?, ?)""", ("admin", default_password_hash))
+    VALUES (?, ?)""", ("admin", password_hash_ver))
 
     cursor.execute("""
     UPDATE Admin SET password = ? WHERE username = ? AND length(password) != 64
-    """, (default_password_hash, "admin"))
+    """, (password_hash_ver, "admin"))
 
     connect.commit()
     connect.close()
