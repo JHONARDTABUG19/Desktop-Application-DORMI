@@ -55,7 +55,9 @@ class Database:
                     middle_initial VARCHAR(255),
                     program VARCHAR(255) NOT NULL,
                     status VARCHAR(255) NOT NULL,
-                    contact VARCHAR(255) NOT NULL
+                    contact VARCHAR(255) NOT NULL,
+                    room VARCHAR(255) DEFAULT '',  
+                    building VARCHAR(255) DEFAULT ''
                 )
             """)
             connect.commit()
@@ -65,8 +67,8 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute(
-                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (student_no, last, first, mi, program, status, contact)
+                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",  # ← 9 values now
+                (student_no, last, first, mi, program, status, contact, "", "")  # ← room, building default empty
             )
             connect.commit()
 
@@ -77,7 +79,12 @@ class Database:
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            cursor.execute("SELECT student_no, TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name), program, '', status, contact FROM students")
+            cursor.execute("""
+                SELECT student_no,
+                    TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name),
+                    program, contact, building, room, status
+                FROM students
+            """)
             for row in cursor.fetchall():
                 tree.insert("", "end", values=row)
 
@@ -193,6 +200,50 @@ class Database:
                 (cs_ID, last, first, mi, email, contact, full_name)
             )
             connect.commit()
+
+
+
+    def get_distinct_buildings(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT DISTINCT building FROM rooms ORDER BY building")
+
+            return [row[0] for row in cursor.fetchall()]
+    
+    def get_rooms_by_building(self, building):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT room_number FROM rooms WHERE building=? AND status='Vacant' ORDER BY room_number",(building,))
+
+            return [row[0] for row in cursor.fetchall()]
+
+
+
+
+    def migrate_students_table(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            try:
+                cursor.execute("ALTER TABLE students ADD COLUMN room VARCHAR(255) DEFAULT ''")
+                cursor.execute("ALTER TABLE students ADD COLUMN building VARCHAR(255) DEFAULT ''")
+                connect.commit()
+            except:
+                pass  # columns already exist, do nothing
+
+    
+    def assign_room_to_student(self, student_no, room, building):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("""
+                UPDATE students SET room=?, building=? WHERE student_no=?
+            """, (room, building, student_no))
+
+
+
+            connect.commit()
+
+
+
         
 
     
@@ -216,6 +267,7 @@ class main(tk.Tk):
         self.db.create_student_table()
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
+        self.db.migrate_students_table()
         
         
         
@@ -494,14 +546,13 @@ class main(tk.Tk):
             e_contact = make_entry(midFrame, 7, 0, colspan=3)
 
             if prefill:
-                e_no.insert(0,      prefill[0])
-                e_program.insert(0, prefill[2])
-                statusVar.set(      prefill[4])
-                e_contact.insert(0, prefill[5])
+                e_no.insert(0,      prefill[0])  # student_no
+                e_program.insert(0, prefill[2])  # program
+                e_contact.insert(0, prefill[3])  # contact ← was index 5, now index 3
+                statusVar.set(      prefill[6])  # status  ← was index 4, now index 6
 
                 parts = prefill[1].split()
                 e_first.insert(0, parts[0])
-                
                 if len(parts) == 3:
                     e_mi.insert(0,   parts[1].replace(".", ""))
                     e_last.insert(0, parts[2])
@@ -527,14 +578,12 @@ class main(tk.Tk):
                 full_name = f"{first} {f'{mi}. ' if mi else ''}{last}".strip()
 
                 if edit_item:
-                    # ── update DB then refresh treeview row ──
                     original_no = self.tree.item(edit_item, "values")[0]
                     self.db.update_student(original_no, no, last, first, mi, program, status, contact)
-                    self.tree.item(edit_item, values=(no, full_name, program, "", status, contact))
+                    self.tree.item(edit_item, values=(no, full_name, program, contact, "", "", status))  
                 else:
-                    # ── insert into DB then add treeview row ──
                     self.db.add_student(no, last, first, mi, program, status, contact)
-                    self.tree.insert("", "end", values=(no, full_name, program, "", status, contact))
+                    self.tree.insert("", "end", values=(no, full_name, program, contact, "", "", status))  
 
                 update_count()
                 self.refresh_dashboard()
@@ -579,14 +628,14 @@ class main(tk.Tk):
             win = tk.Toplevel()
             win.title("Assign Room")
             win.config(bg=content_color)
-            win.geometry("360x320")
+            win.geometry("360x400")  # ← increased height to fit new field
             win.resizable(False, False)
             win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
             tk.Label(upperFrame, text="Assign Room", bg=content_color, fg=FG_DARK,
-                     font=("Segoe UI", 15, "bold")).pack(side="left")
+                    font=("Segoe UI", 15, "bold")).pack(side="left")
 
             midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=15,
                                 bd=1, relief="solid", highlightbackground=BORDER)
@@ -594,34 +643,84 @@ class main(tk.Tk):
             midFrame.columnconfigure(0, weight=1)
 
             tk.Label(midFrame, text=f"Student:  {values[1]}", bg=WHITE, fg=FG_DARK,
-                     font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0,12))
+                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0,12))
+
+            # ── Building ──────────────────────────────────────────────────────────────
+            tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=1, column=0, sticky="w", pady=(0,4))
+
+            buildingVar = tk.StringVar()
+
+            buildings = self.db.get_distinct_buildings()
+
+            buildingDrop = ttk.Combobox(midFrame, textvariable=buildingVar,
+                                        values=buildings,
+                                        state="readonly", font=UNIFORM_FONT)
+            buildingDrop.grid(row=2, column=0, sticky="we", pady=(0,12))
+            
+
+            # ── Room ──────────────────────────────────────────────────────────────────
             tk.Label(midFrame, text="Select Room", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=1, column=0, sticky="w", pady=(0,4))
+                    font=UNIFORM_FONT).grid(row=3, column=0, sticky="w", pady=(0,4))  # ← row 3
 
             roomVar = tk.StringVar()
-            roomDrop = ttk.Combobox(midFrame, textvariable=roomVar,
-                                    values=["101", "102", "103", "104", "105", "106"],
-                                    state="readonly", font=UNIFORM_FONT)
-            roomDrop.grid(row=2, column=0, sticky="we", pady=(0,12))
-            if values[3]:
-                roomDrop.set(values[3])
-            else:
-                roomDrop.current(0)
 
+           
+
+            roomDrop = ttk.Combobox(midFrame, textvariable=roomVar,
+                                    values=[],
+                                    state="readonly", font=UNIFORM_FONT)
+            roomDrop.grid(row=4, column=0, sticky="we", pady=(0,12))  # ← row 4
+
+            def on_building_change(event):
+                selected_building = buildingVar.get()
+                rooms = self.db.get_rooms_by_building(selected_building)  # ← now has a building to filter by
+                roomDrop.config(values=rooms)
+                if rooms:
+                    roomDrop.current(0)
+                else:
+                    roomVar.set("")   # ← clear if no vacant rooms in that building
+
+            def assign_room_to_student(self, student_no, room, building):
+                    with sqlite3.connect(DB_NAME) as connect:
+                        cursor = connect.cursor()  # ← correct syntax
+                        cursor.execute("""
+                            UPDATE students SET room=?, building=? WHERE student_no=?
+                        """, (room, building, student_no))
+                        connect.commit()
+
+            buildingDrop.bind("<<ComboboxSelected>>", on_building_change)
+
+            # ── Status ────────────────────────────────────────────────────────────────
             tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=3, column=0, sticky="w", pady=(0,4))
+                    font=UNIFORM_FONT).grid(row=5, column=0, sticky="w", pady=(0,4))  # ← row 5
             statusVar2 = tk.StringVar()
             statusDrop2 = ttk.Combobox(midFrame, textvariable=statusVar2,
-                                       values=["Active", "Inactive", "On Leave"],
-                                       state="readonly", font=UNIFORM_FONT)
-            statusDrop2.grid(row=4, column=0, sticky="we")
-            statusVar2.set(values[4] if values[4] else "Active")
+                                    values=["Active", "Inactive", "On Leave"],
+                                    state="readonly", font=UNIFORM_FONT)
+            statusDrop2.grid(row=6, column=0, sticky="we")  # ← row 6
+            statusVar2.set(values[6] if values[6] else "Active")
 
             def save_room():
-                new_vals = (values[0], values[1], values[2],
-                            roomVar.get(), statusVar2.get(), values[5])
+                if not buildingVar.get():
+                    return
+                if not roomVar.get():
+                    return
+
+                self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get())
+
+                new_vals = (
+                    values[0],          # student_no  (index 0)
+                    values[1],          # name        (index 1)
+                    values[2],          # program     (index 2)
+                    values[3],          # contact     (index 3) ← was values[5]
+                    buildingVar.get(),  # building    (index 4)
+                    roomVar.get(),      # room        (index 5)
+                    statusVar2.get()    # status      (index 6)
+                )
                 self.tree.item(selected[0], values=new_vals)
                 win.destroy()
+
 
             bottomFrame = tk.Frame(win, bg=content_color)
             bottomFrame.pack(fill="x", padx=15, pady=10)
@@ -729,7 +828,8 @@ class main(tk.Tk):
                   foreground=[("selected", FG_DARK)])
         style.layout("Students.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
-        columns = ("student_no", "name", "program", "room", "status", "contact")
+        columns = ("student_no", "name", "program", "contact", "building", "room", "status")
+
         tree_frame = tk.Frame(card, bg=WHITE)
         tree_frame.pack(fill="both", expand=True, padx=16)
 
@@ -741,10 +841,12 @@ class main(tk.Tk):
             ("student_no", "Student no.", 120, "w"),
             ("name",       "Name",        190, "w"),
             ("program",    "Program",      85, "center"),
+            ("contact",    "Contact",     120, "w"),
+            ("building",   "Building",     90, "center"),
             ("room",       "Room",         70, "center"),
             ("status",     "Status",       95, "center"),
-            ("contact",    "Contact",     120, "w"),
         ]
+
         for cid, heading, width, anchor in col_cfg:
             self.tree.heading(cid, text=heading, anchor=anchor)
             self.tree.column(cid,  width=width,  anchor=anchor, stretch=True)
