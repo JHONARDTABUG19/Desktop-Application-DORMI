@@ -509,17 +509,18 @@ class main(tk.Tk):
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
 
         #START OF TREEVIEW AREA-----------------------------------------
+        
 
-        self.treeStuAss = ttk.Treeview(page, columns=("Student", "Room", "Start Date", "Status"), show="headings")
+        self.treeStuAss = ttk.Treeview(page, columns=("Student", "Building", "Room", "Status"), show="headings")
 
         self.treeStuAss.heading("Student",    text="Student Name")
-        self.treeStuAss.heading("Room",       text="Room")
-        self.treeStuAss.heading("Start Date", text="Start Date")
+        self.treeStuAss.heading("Building",       text="Building")
+        self.treeStuAss.heading("Room",      text="Room")
         self.treeStuAss.heading("Status",     text="Status")
 
         self.treeStuAss.column("Student",    width=150)
-        self.treeStuAss.column("Room",       width=50)
-        self.treeStuAss.column("Start Date", width=75)
+        self.treeStuAss.column("Building",       width=50)
+        self.treeStuAss.column("Room",      width=50)
         self.treeStuAss.column("Status",     width=75)
 
         self.treeStuAss.pack(fill="both", padx=20, pady=10)
@@ -527,9 +528,7 @@ class main(tk.Tk):
         tk.Label(page, text="Cleaning assignments today", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
 
-        self.treeCleanAss = ttk.Treeview(page,
-                                         columns=("ID", "StaffName", "Room", "TimeStart", "TimeEnd"),
-                                         show="headings")
+        self.treeCleanAss = ttk.Treeview(page, columns=("ID", "StaffName", "Room", "TimeStart", "TimeEnd"),show="headings")
         self.treeCleanAss.heading("ID",        text="ID")
         self.treeCleanAss.heading("StaffName", text="Staff Name")
         self.treeCleanAss.heading("Room",      text="Room")
