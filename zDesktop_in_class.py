@@ -2,6 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
 import sqlite3
+import re
 
 UNIFORM_FONT = ("Segoe UI", 10)
 
@@ -632,6 +633,31 @@ class main(tk.Tk):
                 status  = statusVar.get()
                 contact = e_contact.get().strip()
 
+                # Character limit validation
+                limits = [
+                    (no,      20, "Student No."),
+                    (last,    50, "Last Name"),
+                    (first,   50, "First Name"),
+                    (mi,       2, "Middle Initial"),
+                    (program, 10, "Program"),
+                    (contact, 15, "Contact"),
+                ]
+                for value, limit, label in limits:
+                    if len(value) > limit:
+                        err_label.config(text=f"{label} exceeds {limit} character limit.")
+                        return
+                
+                letter_fields = [
+                    (last,    "Last Name"),
+                    (first,   "First Name"),
+                    (mi,      "Middle Initial"),
+                    (program, "Program"),
+                ]
+                for value, label in letter_fields:
+                    if value and not re.match(r"^[A-Za-z\s]+$", value):
+                        err_label.config(text=f"{label} must contain letters only.")
+                        return
+
                 if not no or not last or not first:
                     err_label.config(text="Student No., Last Name and First Name are required.")
                     return
@@ -640,7 +666,7 @@ class main(tk.Tk):
 
                 if edit_item:
                     original_no = self.tree.item(edit_item, "values")[0]
-                    old_values = self.tree.item(edit_item, "values")
+                    old_values  = self.tree.item(edit_item, "values")
                     self.db.update_student(original_no, no, last, first, mi, program, status, contact)
                     self.tree.item(edit_item, values=(
                         no, full_name, program, contact,
@@ -650,7 +676,7 @@ class main(tk.Tk):
                     ))
                 else:
                     self.db.add_student(no, last, first, mi, program, status, contact)
-                    self.tree.insert("", "end", values=(no, full_name, program, contact, "", "", status))  
+                    self.tree.insert("", "end", values=(no, full_name, program, contact, "", "", status))
 
                 update_count()
                 self.refresh_dashboard()
