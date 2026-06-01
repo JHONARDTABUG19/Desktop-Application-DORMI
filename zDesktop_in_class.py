@@ -1,7 +1,8 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import INSERT, messagebox
+from tkinter import messagebox
 import sqlite3
+import re
 
 UNIFORM_FONT = ("Segoe UI", 10)
 
@@ -24,6 +25,25 @@ DB_NAME = "dorm_management.db"
 
 class Database:
 
+    def for_dashboard(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT COUNT(*) FROM students")
+            total_students = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM rooms")
+            total_rooms = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM rooms WHERE occupants > 0")
+            rooms_occupied = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM cleaningStaff")
+            total_cleaning_tasks = cursor.fetchone()[0]
+
+            return total_students, total_rooms, rooms_occupied, total_cleaning_tasks
+        
+    
+
     def create_student_table(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -36,26 +56,36 @@ class Database:
                     middle_initial VARCHAR(255),
                     program VARCHAR(255) NOT NULL,
                     status VARCHAR(255) NOT NULL,
-                    contact VARCHAR(255) NOT NULL
+                    contact VARCHAR(255) NOT NULL,
+                    room VARCHAR(255) DEFAULT '',  
+                    building VARCHAR(255) DEFAULT ''
                 )
             """)
             connect.commit()
+            
 
     def add_student(self, student_no, last, first, mi, program, status, contact):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute(
-                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (student_no, last, first, mi, program, status, contact)
+                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",  # ← 9 values now
+                (student_no, last, first, mi, program, status, contact, "", "")  # ← room, building default empty
             )
             connect.commit()
+
+            
 
     def get_all_students(self, tree):
         for row in tree.get_children():
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            cursor.execute("SELECT student_no, TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name), program, '', status, contact FROM students")
+            cursor.execute("""
+                SELECT student_no,
+                    TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name),
+                    program, contact, building, room, status
+                FROM students
+            """)
             for row in cursor.fetchall():
                 tree.insert("", "end", values=row)
 
@@ -171,6 +201,89 @@ class Database:
                 (cs_ID, last, first, mi, email, contact, full_name)
             )
             connect.commit()
+
+
+
+    def get_distinct_buildings(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT DISTINCT building FROM rooms ORDER BY building")
+
+            return [row[0] for row in cursor.fetchall()]
+    
+    def get_rooms_by_building(self, building):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT room_number FROM rooms WHERE building=? AND status='Vacant' ORDER BY room_number",(building,))
+
+            return [row[0] for row in cursor.fetchall()]
+
+
+
+
+    def migrate_students_table(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            try:
+                cursor.execute("ALTER TABLE students ADD COLUMN room VARCHAR(255) DEFAULT ''")
+                cursor.execute("ALTER TABLE students ADD COLUMN building VARCHAR(255) DEFAULT ''")
+                connect.commit()
+            except:
+                pass  # columns already exist, do nothing
+
+    
+    def assign_room_to_student(self, student_no, room, building):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            
+            # Update student's room and building
+            cursor.execute("""
+                UPDATE students SET room=?, building=? WHERE student_no=?
+            """, (room, building, student_no))
+            
+            # Increment occupants in that specific room and building
+            cursor.execute("""
+                UPDATE rooms SET occupants = occupants + 1
+                WHERE room_number=? AND building=?
+            """, (room, building))
+            
+            # Update status to 'Occupied' if occupants >= capacity
+            cursor.execute("""
+                UPDATE rooms SET status='Occupied'
+                WHERE room_number=? AND building=? AND occupants >= capacity
+            """, (room, building))
+            
+            connect.commit()
+
+
+
+    def collect_room(self):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT room_number FROM rooms WHERE status='Vacant'")
+            rooms = cursor.fetchall()
+            return [room[0] for room in rooms]
+
+    
+    def remove_student_from_room(self, student_no):
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            # Get the student's current room and building first
+            cursor.execute("SELECT room, building FROM students WHERE student_no=?", (student_no,))
+            row = cursor.fetchone()
+            if row and row[0] and row[1]:  # only if they have a room assigned
+                room, building = row
+                cursor.execute("""
+                    UPDATE rooms SET occupants = MAX(0, occupants - 1)
+                    WHERE room_number=? AND building=?
+                """, (room, building))
+                # Set back to Vacant if occupants dropped below capacity
+                cursor.execute("""
+                    UPDATE rooms SET status='Vacant'
+                    WHERE room_number=? AND building=? AND occupants < capacity AND status='Occupied'
+                """, (room, building))
+            connect.commit()
+
         
 
     
@@ -194,11 +307,15 @@ class main(tk.Tk):
         self.db.create_student_table()
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
+        self.db.migrate_students_table()
+        
+        
         
         self.all_pages   = []
         self.all_buttons = []
 
         self.main_build_layout()
+        self.refresh_dashboard()
 
     # ── Layout ────────────────────────────────────────────────────────
     def main_build_layout(self):
@@ -283,6 +400,15 @@ class main(tk.Tk):
         self.Settings.config(       command=lambda: self.show_page(self.settings_page,  self.Settings))
 
         self.show_page(self.dashboard_page, self.dashboardButton)
+    
+    #updating dashboard numbers after changes in students and rooms pages
+    def refresh_dashboard(self):                          
+            ts, tr, tro, tc = self.db.for_dashboard()
+            print(ts, tr, tro, tc)           
+            self.tsNum.config(text=str(ts))
+            self.trNum.config(text=str(tr))
+            self.troNum.config(text=str(tro))
+            self.tcNum.config(text=str(tc))
 
     # ── Navigation ────────────────────────────────────────────────────
     def show_page(self, page, active_btn):
@@ -301,52 +427,78 @@ class main(tk.Tk):
         cards_frame = tk.Frame(page, bg=content_color)
         cards_frame.pack(fill="x", padx=30, pady=10)
 
-        totalstudents_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+        # ── Total Students — warm brown ───────────────────────────────
+        totalstudents_Lframe = tk.Frame(cards_frame, width=200, height=150, bg="white",
+                                        highlightbackground="#d0c4b0", highlightthickness=1)
         totalstudents_Lframe.pack(side="left", padx=(0, 10), fill="x", expand=True)
         totalstudents_Lframe.pack_propagate(False)
-        tk.Label(totalstudents_Lframe, text="🧑", font=("Arial", 24),
-                 bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
-        self.tsNum = tk.Label(totalstudents_Lframe, text="0",
-                              font=("Arial", 24, "bold"), bg="white", fg="black")
-        self.tsNum.pack(anchor="w", padx=10, pady=5)
-        tk.Label(totalstudents_Lframe, text="Total students", font=("Arial", 15),
-                 bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
 
-        totalrooms_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+        tk.Frame(totalstudents_Lframe, bg="#8A5F41", width=5).pack(side="left", fill="y")
+        ts_inner = tk.Frame(totalstudents_Lframe, bg="white")
+        ts_inner.pack(side="left", fill="both", expand=True)
+
+        tk.Label(ts_inner, text="🧑", font=("Arial", 24),
+                 bg="white", fg="#8A5F41").pack(anchor="w", padx=10, pady=(10, 0))
+        self.tsNum = tk.Label(ts_inner, text="0", font=("Arial", 24, "bold"), bg="white", fg="#8A5F41")
+        self.tsNum.pack(anchor="w", padx=10)
+        tk.Label(ts_inner, text="Total students", font=("Arial", 13),
+                 bg="white", fg="#a07850").pack(anchor="w", padx=10, pady=(2, 0))
+
+        # ── Total Rooms — dusty teal ──────────────────────────────────
+        totalrooms_Lframe = tk.Frame(cards_frame, width=200, height=150, bg="white",
+                                     highlightbackground="#d0c4b0", highlightthickness=1)
         totalrooms_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalrooms_Lframe.pack_propagate(False)
-        tk.Label(totalrooms_Lframe, text="🛏️", font=("Arial", 24),
-                 bg="white", fg="Green").pack(anchor="w", padx=10, pady=5)
-        self.trNum = tk.Label(totalrooms_Lframe, text="0",
-                              font=("Arial", 24, "bold"), bg="white", fg="black")
-        self.trNum.pack(anchor="w", padx=10, pady=5)
-        tk.Label(totalrooms_Lframe, text="Total rooms", font=("Arial", 15),
-                 bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
 
-        totalroomsoccupied_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+        tk.Frame(totalrooms_Lframe, bg="#4A8C7A", width=5).pack(side="left", fill="y")
+        tr_inner = tk.Frame(totalrooms_Lframe, bg="white")
+        tr_inner.pack(side="left", fill="both", expand=True)
+
+        tk.Label(tr_inner, text="🛏️", font=("Arial", 24),
+                 bg="white", fg="#4A8C7A").pack(anchor="w", padx=10, pady=(10, 0))
+        self.trNum = tk.Label(tr_inner, text="0", font=("Arial", 24, "bold"), bg="white", fg="#4A8C7A")
+        self.trNum.pack(anchor="w", padx=10)
+        tk.Label(tr_inner, text="Total rooms", font=("Arial", 13),
+                 bg="white", fg="#3a7060").pack(anchor="w", padx=10, pady=(2, 0))
+
+        # ── Rooms Occupied — muted amber ──────────────────────────────
+        totalroomsoccupied_Lframe = tk.Frame(cards_frame, width=200, height=150, bg="white",
+                                             highlightbackground="#d0c4b0", highlightthickness=1)
         totalroomsoccupied_Lframe.pack(side="left", padx=10, fill="x", expand=True)
         totalroomsoccupied_Lframe.pack_propagate(False)
-        tk.Label(totalroomsoccupied_Lframe, text="🛏️", font=("Arial", 24),
-                 bg="white", fg="violet").pack(anchor="w", padx=10, pady=5)
-        self.troNum = tk.Label(totalroomsoccupied_Lframe, text="0",
-                               font=("Arial", 24, "bold"), bg="white", fg="black")
-        self.troNum.pack(anchor="w", padx=10, pady=5)
-        tk.Label(totalroomsoccupied_Lframe, text="Rooms occupied", font=("Arial", 15),
-                 bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
 
-        totalcleaning_Lframe = tk.LabelFrame(cards_frame, width=200, height=150, bg="white")
+        tk.Frame(totalroomsoccupied_Lframe, bg="#C48B2A", width=5).pack(side="left", fill="y")
+        tro_inner = tk.Frame(totalroomsoccupied_Lframe, bg="white")
+        tro_inner.pack(side="left", fill="both", expand=True)
+
+        tk.Label(tro_inner, text="🛏️", font=("Arial", 24),
+                 bg="white", fg="#C48B2A").pack(anchor="w", padx=10, pady=(10, 0))
+        self.troNum = tk.Label(tro_inner, text="0", font=("Arial", 24, "bold"), bg="white", fg="#C48B2A")
+        self.troNum.pack(anchor="w", padx=10)
+        tk.Label(tro_inner, text="Rooms occupied", font=("Arial", 13),
+                 bg="white", fg="#a07020").pack(anchor="w", padx=10, pady=(2, 0))
+
+        # ── Cleaning Tasks — dusty rose ───────────────────────────────
+        totalcleaning_Lframe = tk.Frame(cards_frame, width=200, height=150, bg="white",
+                                        highlightbackground="#d0c4b0", highlightthickness=1)
         totalcleaning_Lframe.pack(side="left", padx=(10, 0), fill="x", expand=True)
         totalcleaning_Lframe.pack_propagate(False)
-        tk.Label(totalcleaning_Lframe, text="🧹", font=("Arial", 24),
-                 bg="white", fg="brown").pack(anchor="w", padx=10, pady=5)
-        self.tcNum = tk.Label(totalcleaning_Lframe, text="0",
-                              font=("Arial", 24, "bold"), bg="white", fg="black")
-        self.tcNum.pack(anchor="w", padx=10, pady=5)
-        tk.Label(totalcleaning_Lframe, text="Cleaning tasks", font=("Arial", 15),
-                 bg="white", fg="black").pack(anchor="w", padx=10, pady=(5, 0))
+
+        tk.Frame(totalcleaning_Lframe, bg="#A05C6A", width=5).pack(side="left", fill="y")
+        tc_inner = tk.Frame(totalcleaning_Lframe, bg="white")
+        tc_inner.pack(side="left", fill="both", expand=True)
+
+        tk.Label(tc_inner, text="🧹", font=("Arial", 24),
+                 bg="white", fg="#A05C6A").pack(anchor="w", padx=10, pady=(10, 0))
+        self.tcNum = tk.Label(tc_inner, text="0", font=("Arial", 24, "bold"), bg="white", fg="#A05C6A")
+        self.tcNum.pack(anchor="w", padx=10)
+        tk.Label(tc_inner, text="Cleaning Staff", font=("Arial", 13),
+                 bg="white", fg="#804050").pack(anchor="w", padx=10, pady=(2, 0))
 
         tk.Label(page, text="Recent student assignments", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
+
+        #START OF TREEVIEW AREA-----------------------------------------
 
         self.treeStuAss = ttk.Treeview(page, columns=("Student", "Room", "Start Date", "Status"), show="headings")
 
@@ -390,6 +542,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("500x400")
             win.resizable(False, False)
+            win.grab_set()
 
             tk.Frame(win, bg=content_color)
             upperFrame = tk.Frame(win, bg=content_color)
@@ -455,14 +608,13 @@ class main(tk.Tk):
             e_contact = make_entry(midFrame, 7, 0, colspan=3)
 
             if prefill:
-                e_no.insert(0,      prefill[0])
-                e_program.insert(0, prefill[2])
-                statusVar.set(      prefill[4])
-                e_contact.insert(0, prefill[5])
+                e_no.insert(0,      prefill[0])  # student_no
+                e_program.insert(0, prefill[2])  # program
+                e_contact.insert(0, prefill[3])  # contact ← was index 5, now index 3
+                statusVar.set(      prefill[6])  # status  ← was index 4, now index 6
 
                 parts = prefill[1].split()
                 e_first.insert(0, parts[0])
-                
                 if len(parts) == 3:
                     e_mi.insert(0,   parts[1].replace(".", ""))
                     e_last.insert(0, parts[2])
@@ -481,6 +633,31 @@ class main(tk.Tk):
                 status  = statusVar.get()
                 contact = e_contact.get().strip()
 
+                # Character limit validation
+                limits = [
+                    (no,      20, "Student No."),
+                    (last,    50, "Last Name"),
+                    (first,   50, "First Name"),
+                    (mi,       2, "Middle Initial"),
+                    (program, 10, "Program"),
+                    (contact, 15, "Contact"),
+                ]
+                for value, limit, label in limits:
+                    if len(value) > limit:
+                        err_label.config(text=f"{label} exceeds {limit} character limit.")
+                        return
+                
+                letter_fields = [
+                    (last,    "Last Name"),
+                    (first,   "First Name"),
+                    (mi,      "Middle Initial"),
+                    (program, "Program"),
+                ]
+                for value, label in letter_fields:
+                    if value and not re.match(r"^[A-Za-z\s]+$", value):
+                        err_label.config(text=f"{label} must contain letters only.")
+                        return
+
                 if not no or not last or not first:
                     err_label.config(text="Student No., Last Name and First Name are required.")
                     return
@@ -488,16 +665,21 @@ class main(tk.Tk):
                 full_name = f"{first} {f'{mi}. ' if mi else ''}{last}".strip()
 
                 if edit_item:
-                    # ── update DB then refresh treeview row ──
                     original_no = self.tree.item(edit_item, "values")[0]
+                    old_values  = self.tree.item(edit_item, "values")
                     self.db.update_student(original_no, no, last, first, mi, program, status, contact)
-                    self.tree.item(edit_item, values=(no, full_name, program, "", status, contact))
+                    self.tree.item(edit_item, values=(
+                        no, full_name, program, contact,
+                        old_values[4],  # preserve building
+                        old_values[5],  # preserve room
+                        status
+                    ))
                 else:
-                    # ── insert into DB then add treeview row ──
                     self.db.add_student(no, last, first, mi, program, status, contact)
-                    self.tree.insert("", "end", values=(no, full_name, program, "", status, contact))
+                    self.tree.insert("", "end", values=(no, full_name, program, contact, "", "", status))
 
                 update_count()
+                self.refresh_dashboard()
                 win.destroy()
 
             bottomFrame = tk.Frame(win, bg=content_color)
@@ -515,8 +697,12 @@ class main(tk.Tk):
                 messagebox_info("Select a student first.", "No Selection")
                 return
             if messagebox_confirm("Delete this student? This cannot be undone."):
+                student_no = self.tree.item(selected[0], "values")[0]
+                self.db.remove_student_from_room(student_no)   # ← add this line
+                self.db.delete_student(student_no)
                 self.tree.delete(selected[0])
                 update_count()
+                self.refresh_dashboard()
 
         def edit_student():
             selected = self.tree.selection()
@@ -536,13 +722,14 @@ class main(tk.Tk):
             win = tk.Toplevel()
             win.title("Assign Room")
             win.config(bg=content_color)
-            win.geometry("360x260")
+            win.geometry("360x400")  # ← increased height to fit new field
             win.resizable(False, False)
+            win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
             tk.Label(upperFrame, text="Assign Room", bg=content_color, fg=FG_DARK,
-                     font=("Segoe UI", 15, "bold")).pack(side="left")
+                    font=("Segoe UI", 15, "bold")).pack(side="left")
 
             midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=15,
                                 bd=1, relief="solid", highlightbackground=BORDER)
@@ -550,34 +737,78 @@ class main(tk.Tk):
             midFrame.columnconfigure(0, weight=1)
 
             tk.Label(midFrame, text=f"Student:  {values[1]}", bg=WHITE, fg=FG_DARK,
-                     font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0,12))
+                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0,12))
+
+            # ── Building ──────────────────────────────────────────────────────────────
+            tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                    font=UNIFORM_FONT).grid(row=1, column=0, sticky="w", pady=(0,4))
+
+            buildingVar = tk.StringVar()
+
+            buildings = self.db.get_distinct_buildings()
+
+            buildingDrop = ttk.Combobox(midFrame, textvariable=buildingVar,
+                                        values=buildings,
+                                        state="readonly", font=UNIFORM_FONT)
+            buildingDrop.grid(row=2, column=0, sticky="we", pady=(0,12))
+            
+
+            # ── Room ──────────────────────────────────────────────────────────────────
             tk.Label(midFrame, text="Select Room", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=1, column=0, sticky="w", pady=(0,4))
+                    font=UNIFORM_FONT).grid(row=3, column=0, sticky="w", pady=(0,4))  # ← row 3
 
             roomVar = tk.StringVar()
-            roomDrop = ttk.Combobox(midFrame, textvariable=roomVar,
-                                    values=["101", "102", "103", "104", "105", "106"],
-                                    state="readonly", font=UNIFORM_FONT)
-            roomDrop.grid(row=2, column=0, sticky="we", pady=(0,12))
-            if values[3]:
-                roomDrop.set(values[3])
-            else:
-                roomDrop.current(0)
 
+           
+
+            roomDrop = ttk.Combobox(midFrame, textvariable=roomVar,
+                                    values=[],
+                                    state="readonly", font=UNIFORM_FONT)
+            roomDrop.grid(row=4, column=0, sticky="we", pady=(0,12))  # ← row 4
+
+            def on_building_change(event):
+                selected_building = buildingVar.get()
+                rooms = self.db.get_rooms_by_building(selected_building)  # ← now has a building to filter by
+                roomDrop.config(values=rooms)
+                if rooms:
+                    roomDrop.current(0)
+                else:
+                    roomVar.set("")   # ← clear if no vacant rooms in that building
+
+            buildingDrop.bind("<<ComboboxSelected>>", on_building_change)
+
+            # ── Status ────────────────────────────────────────────────────────────────
             tk.Label(midFrame, text="Status", bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=3, column=0, sticky="w", pady=(0,4))
+                    font=UNIFORM_FONT).grid(row=5, column=0, sticky="w", pady=(0,4))  # ← row 5
             statusVar2 = tk.StringVar()
             statusDrop2 = ttk.Combobox(midFrame, textvariable=statusVar2,
-                                       values=["Active", "Inactive", "On Leave"],
-                                       state="readonly", font=UNIFORM_FONT)
-            statusDrop2.grid(row=4, column=0, sticky="we")
-            statusVar2.set(values[4] if values[4] else "Active")
+                                    values=["Active", "Inactive", "On Leave"],
+                                    state="readonly", font=UNIFORM_FONT)
+            statusDrop2.grid(row=6, column=0, sticky="we")  # ← row 6
+            statusVar2.set(values[6] if values[6] else "Active")
 
             def save_room():
-                new_vals = (values[0], values[1], values[2],
-                            roomVar.get(), statusVar2.get(), values[5])
+                if not buildingVar.get():
+                    return
+                if not roomVar.get():
+                    return
+
+                self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get())
+                self.db.get_all_rooms(self.rooms_tree)
+
+                new_vals = (
+                    values[0],          # student_no  (index 0)
+                    values[1],          # name        (index 1)
+                    values[2],          # program     (index 2)
+                    values[3],          # contact     (index 3) ← was values[5]
+                    buildingVar.get(),  # building    (index 4)
+                    roomVar.get(),      # room        (index 5)
+                    statusVar2.get()    # status      (index 6)
+                )
                 self.tree.item(selected[0], values=new_vals)
+                self.refresh_dashboard()
                 win.destroy()
+
 
             bottomFrame = tk.Frame(win, bg=content_color)
             bottomFrame.pack(fill="x", padx=15, pady=10)
@@ -594,6 +825,7 @@ class main(tk.Tk):
             win.config(bg=WHITE)
             win.geometry("300x120")
             win.resizable(False, False)
+            win.grab_set()
             tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
                      font=UNIFORM_FONT, wraplength=260).pack(pady=20)
             tk.Button(win, text="OK", bg=BLACK, fg=WHITE, font=UNIFORM_FONT,
@@ -638,15 +870,29 @@ class main(tk.Tk):
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-        search_wrap = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        search_wrap.pack(fill="x", padx=16, pady=(14, 10))
-        tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
-                 font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+        filter_bar_students = tk.Frame(card, bg=WHITE)
+        filter_bar_students.pack(fill="x", padx=16, pady=(14, 10))
+
+        # ── Search field ──────────────────────────────────────────────────────
+
+        search_wrap_students = tk.Frame(filter_bar_students, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
+                font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+        search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                 font=UNIFORM_FONT, relief="flat", bd=0,
                                 insertbackground=FG_DARK)
-        search_entry.insert(0, "Search by name or student number...")
+        search_entry.insert(0, "Search by ID or Name...")
         search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        # ── Search button ─────────────────────────────────────────────────────
+        tk.Button(filter_bar_students, text="Search", fg="BLACK", bg=content_color,
+                  font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                  cursor="hand2").pack(side="left", padx=(0, 16))
+
+        # ── Sort filter ─────────────────────────────────────────────────────
+       
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -659,7 +905,8 @@ class main(tk.Tk):
                   foreground=[("selected", FG_DARK)])
         style.layout("Students.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
-        columns = ("student_no", "name", "program", "room", "status", "contact")
+        columns = ("student_no", "name", "program", "contact", "building", "room", "status")
+
         tree_frame = tk.Frame(card, bg=WHITE)
         tree_frame.pack(fill="both", expand=True, padx=16)
 
@@ -671,10 +918,12 @@ class main(tk.Tk):
             ("student_no", "Student no.", 120, "w"),
             ("name",       "Name",        190, "w"),
             ("program",    "Program",      85, "center"),
+            ("contact",    "Contact",     120, "w"),
+            ("building",   "Building",     90, "center"),
             ("room",       "Room",         70, "center"),
             ("status",     "Status",       95, "center"),
-            ("contact",    "Contact",     120, "w"),
         ]
+
         for cid, heading, width, anchor in col_cfg:
             self.tree.heading(cid, text=heading, anchor=anchor)
             self.tree.column(cid,  width=width,  anchor=anchor, stretch=True)
@@ -723,6 +972,7 @@ class main(tk.Tk):
             win.config(bg=WHITE)
             win.geometry("300x120")
             win.resizable(False, False)
+            win.grab_set()
             tk.Label(win, text=msg, bg=WHITE, fg=FG_DARK,
                      font=UNIFORM_FONT, wraplength=260).pack(pady=20)
             tk.Button(win, text="OK", bg=BLACK, fg=WHITE, font=UNIFORM_FONT,
@@ -765,15 +1015,31 @@ class main(tk.Tk):
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-        search_wrap = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        search_wrap.pack(fill="x", padx=16, pady=(14, 10))
-        tk.Label(search_wrap, text="🔍", bg=WHITE, fg=FG_MUTED,
-                 font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        search_entry = tk.Entry(search_wrap, bg=WHITE, fg=FG_MUTED,
+        #start of filter frame
+
+        filter_bar_rooms = tk.Frame(card, bg=WHITE)
+        filter_bar_rooms.pack(fill="x", padx=16, pady=(14, 10))
+
+        search_wrap_students = tk.Frame(filter_bar_rooms, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
+                font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
+        search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                 font=UNIFORM_FONT, relief="flat", bd=0,
                                 insertbackground=FG_DARK)
-        search_entry.insert(0, "Search by room number or type...")
+        search_entry.insert(0, "Search by ID or Name...")
         search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        # ── Search button ─────────────────────────────────────────────────────
+        tk.Button(filter_bar_rooms, text="Search", fg="BLACK", bg=content_color,
+                  font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+                  cursor="hand2").pack(side="left", padx=(0, 16))
+
+        # ── Sort filter ─────────────────────────────────────────────────────
+        
+        
+        #end of frame of filters
 
         filter_frame = tk.Frame(card, bg=WHITE)
         filter_frame.pack(fill="x", padx=16, pady=(0, 8))
@@ -840,6 +1106,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("420x340")
             win.resizable(False, False)
+            win.grab_set()
 
             def save_room():
                 room_no  = roomNumEntry.get().strip()
@@ -861,6 +1128,7 @@ class main(tk.Tk):
                 # always re-fetch from DB to stay in sync
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
+                self.refresh_dashboard()
                 win.destroy()
 
             upperFrame = tk.Frame(win, bg=content_color)
@@ -918,7 +1186,7 @@ class main(tk.Tk):
 
             capacityVar = tk.StringVar()
             capDropdown = ttk.Combobox(midFrame, textvariable=capacityVar,
-                                    values=["1", "2", "3", "4"],
+                                    values=["1", "2", "3", "4", "5", "6", "7", "8"],
                                     state="readonly", font=UNIFORM_FONT)
             capDropdown.grid(row=3, column=1, sticky="we", pady=(0, 12))
             capDropdown.current(0)
@@ -962,6 +1230,7 @@ class main(tk.Tk):
                 self.db.delete_room(room_id)
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
+                self.refresh_dashboard()
 
         def edit_room():
             selected = self.rooms_tree.selection()
@@ -984,6 +1253,7 @@ class main(tk.Tk):
             win.config(bg=content_color)
             win.geometry("360x320")
             win.resizable(False, False)
+            win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
             upperFrame.pack(fill="x", padx=15, pady=12)
@@ -999,11 +1269,12 @@ class main(tk.Tk):
 
             fields = [
                 ("Room Number",  values[0]),
-                ("Room Type",    values[1]),
-                ("Capacity",     values[2]),
-                ("Occupants",    values[3]),
-                ("Status",       values[4]),
-                ("Last Cleaned", values[5]),
+                ("Building",     values[1]),
+                ("Room Type",    values[2]),
+                ("Capacity",     values[3]),
+                ("Occupants",    values[4]),
+                ("Status",       values[5]),
+                ("Last Cleaned", values[6]),
             ]
             for i, (label, value) in enumerate(fields):
                 tk.Label(midFrame, text=label, bg=WHITE, fg=FG_MUTED,
@@ -1052,12 +1323,13 @@ class main(tk.Tk):
                 addStaff.config(bg=content_color)
                 addStaff.geometry("500x360")
                 addStaff.resizable(False, False)
+                addStaff.grab_set()
 
                 def save_staff():
                     id_val       = idEntry.get().strip()
                     last_val     = LN_Entry.get().strip()
                     first_val    = FN_Entry.get().strip()
-                    mi_val       = MI_Entry.get().strip()
+                    mi_val       = MI_Entry.get().strip() + "."
                     email_val    = emailEntry.get().strip()
                     contact_val  = contactEntry.get().strip()
                     fullname_val = f"{last_val}, {first_val} {mi_val}".strip()
@@ -1069,9 +1341,24 @@ class main(tk.Tk):
                     try:
                         self.db.insert_cleaning_staff(id_val, last_val, first_val, mi_val, email_val, contact_val, fullname_val)
                         self.db.get_all_cleaning_staff(self.cleaning_tree)
+                        self.refresh_dashboard()
                         addStaff.destroy()
                     except Exception as e:
                         messagebox.showerror("Database Error", f"Failed to add staff entry:\n{e}")
+
+                def validate_int(P):
+                    # Allow empty input so users can delete characters
+                    if P == "":
+                        return True
+                    # Check if the entire string consists only of numbers
+                    return P.isdigit()
+                vcmd_int = addStaff.register(validate_int)
+
+                def validate_str(P):
+                    if P == "":
+                        return True
+                    return P.isalpha() or P.isspace()
+                vcmd_str = addStaff.register(validate_str)
 
                 upperFrame = tk.Frame(addStaff, bg=content_color)
                 upperFrame.pack(fill="x", padx=15, pady=12)
@@ -1090,7 +1377,7 @@ class main(tk.Tk):
                 idFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 idFrame.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 15))
                 idEntry = tk.Entry(idFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                relief="flat", bd=0, insertbackground=FG_DARK)
+                                    relief="flat", bd=0, insertbackground=FG_DARK)
                 idEntry.pack(fill="x", padx=5, pady=4)
 
                 lnGroup = tk.Frame(midFrame, bg=WHITE)
@@ -1100,7 +1387,7 @@ class main(tk.Tk):
                 lnBorder = tk.Frame(lnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 lnBorder.pack(fill="x")
                 LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                                    validate="key", validatecommand=(vcmd_str, "%P"), relief="flat", bd=0, insertbackground=FG_DARK)
                 LN_Entry.pack(fill="x", padx=5, pady=4)
 
                 fnGroup = tk.Frame(midFrame, bg=WHITE)
@@ -1110,7 +1397,7 @@ class main(tk.Tk):
                 fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 fnBorder.pack(fill="x")
                 FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                                    validate="key", validatecommand=(vcmd_str, "%P"), relief="flat", bd=0, insertbackground=FG_DARK)
                 FN_Entry.pack(fill="x", padx=5, pady=4)
 
                 miGroup = tk.Frame(midFrame, bg=WHITE)
@@ -1120,7 +1407,7 @@ class main(tk.Tk):
                 miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 miBorder.pack()
                 MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK, width=3)
+                                    validate="key", validatecommand=(vcmd_str, "%P"), relief="flat", bd=0, insertbackground=FG_DARK, width=3)
                 MI_Entry.pack(padx=5, pady=4)
 
                 emailGroup = tk.Frame(midFrame, bg=WHITE)
@@ -1139,16 +1426,21 @@ class main(tk.Tk):
                         font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
                 contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 contactBorder.pack(fill="x")
-                contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                contactEntry = tk.Entry(contactBorder, validate="key", validatecommand=(vcmd_int, "%P"), 
+                                        bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
                                         relief="flat", bd=0, insertbackground=FG_DARK)
                 contactEntry.pack(fill="x", padx=5, pady=4)
 
                 bottomFrame = tk.Frame(addStaff, bg=content_color)
                 bottomFrame.pack(fill="x", padx=15, pady=15)
-                tk.Button(bottomFrame, text="Add Staff", font=UNIFORM_FONT,
-                        command=save_staff).pack(side="right", padx=(5, 0))
-                tk.Button(bottomFrame, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
-                        command=addStaff.destroy).pack(side="right")
+
+                tk.Button(bottomFrame, text="Save", font=UNIFORM_FONT,
+                      bg=BLACK, fg=WHITE, relief="flat", padx=12, pady=5,
+                      cursor="hand2", command=save_staff).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Cancel", font=UNIFORM_FONT,
+                      fg="#c0392b", relief="flat", padx=12, pady=5,
+                      cursor="hand2", command=addStaff.destroy).pack(side="right")
+        
 
             def select_record(event):
                 selected = self.cleaning_tree.focus()
@@ -1169,6 +1461,7 @@ class main(tk.Tk):
                 editStaff.config(bg=content_color)
                 editStaff.geometry("500x360")
                 editStaff.resizable(False, False)
+                editStaff.grab_set()
 
                 def update_staff():
                     id_val       = idEntry.get().strip()
@@ -1293,6 +1586,45 @@ class main(tk.Tk):
                     self.cleaning_tree.delete(row)
                 self.db.get_all_cleaning_staff(self.cleaning_tree)
 
+            def search_staff(event=None):
+                # 1. Grab the current search string from the Entry box
+                search_query = search_entry.get().strip()
+                
+                # 2. Clear out all rows currently visible in the Treeview table
+                for row in self.cleaning_tree.get_children():
+                    self.cleaning_tree.delete(row)
+                    
+                # 3. If the search box is completely empty, reset and load everything normally
+                if not search_query:
+                    self.db.get_all_cleaning_staff(self.cleaning_tree)
+                    return
+
+                try:
+                    # 4. Fall back to your database connection to run a pattern match (LIKE) query
+                    con = sqlite3.connect(DB_NAME)
+                    cur = con.cursor()
+                    
+                    # We use lower() and % wildcards to ensure partial, case-insensitive matching
+                    sql = """
+                        SELECT cs_ID, full_name, contact, email 
+                        FROM cleaningStaff 
+                        WHERE cs_ID LIKE ? 
+                        OR full_name LIKE ? 
+                        OR email LIKE ? 
+                        OR contact LIKE ?
+                    """
+                    wildcard = f"%{search_query}%"
+                    cur.execute(sql, (wildcard, wildcard, wildcard, wildcard))
+                    rows = cur.fetchall()
+                    
+                    # 5. Populate the table view only with matching database records
+                    for row in rows:
+                        self.cleaning_tree.insert("", "end", values=row)
+                        
+                    con.close()
+                except Exception as e:
+                    messagebox.showerror("Search Error", f"Failed to execute query search:\n{e}")
+
             def clear_fields():
                 cs_ID.set("")
                 last.set("")
@@ -1318,15 +1650,22 @@ class main(tk.Tk):
                         con.close()
                         load_data()
                         clear_fields()
+                        self.refresh_dashboard()
                     except Exception as e:
                         messagebox.showerror("Database Error", f"Failed to execute row deletion:\n{e}")
 
             def CSassign_window():
+                selected_id = cs_ID.get()
+                if not selected_id:
+                    messagebox.showwarning("Selection Required", "Please click a cleaning staff record from the table first.")
+                    return
+
                 assign = tk.Toplevel()
                 assign.title("Assign Cleaning")
                 assign.config(bg=content_color)
                 assign.geometry("420x360")
                 assign.resizable(False, False)
+                assign.grab_set()
 
                 upperFrame = tk.Frame(assign, bg=content_color)
                 upperFrame.pack(fill="x", padx=15, pady=12)
@@ -1339,15 +1678,29 @@ class main(tk.Tk):
                 midFrame.columnconfigure(0, weight=1)
                 midFrame.columnconfigure(1, weight=1)
 
+                # ── BUILDING DROPDOWN (Column 0) ─────────────────────────────────
+                tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", pady=(0, 2), padx=(0, 4))
+                
+                buildingSelection = tk.StringVar()
+                buildingOptions = ["Building A", "Building B", "Building C"]
+                buildingDropdown = ttk.Combobox(midFrame, textvariable=buildingSelection, values=buildingOptions,
+                                                state="readonly", font=UNIFORM_FONT)
+                buildingDropdown.grid(row=1, column=0, sticky="we", pady=(0, 12), padx=(0, 4))
+                buildingDropdown.current(0)
+
+                # ── ROOM DROPDOWN (Column 1) ─────────────────────────────────────
                 tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
-                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2))
+                        font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2), padx=(4, 0))
+                
                 roomSelection = tk.StringVar()
                 roomOptions = ["Option 1", "Option 2", "Option 3"]
                 roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=roomOptions,
                                             state="readonly", font=UNIFORM_FONT)
-                roomDropdown.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 12))
+                roomDropdown.grid(row=1, column=1, sticky="we", pady=(0, 12), padx=(4, 0))
                 roomDropdown.current(0)
 
+                # ── DATE (Spans across both columns) ──────────────────────────────
                 tk.Label(midFrame, text="Date", bg=WHITE, fg=FG_DARK,
                         font=UNIFORM_FONT).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 2))
                 searchFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
@@ -1356,8 +1709,9 @@ class main(tk.Tk):
                                     relief="flat", bd=0, insertbackground=FG_DARK)
                 dateEntry.pack(fill="x", padx=5, pady=3)
 
+                # ── TIME START (Column 0) ─────────────────────────────────────────
                 timeStartFrame = tk.Frame(midFrame, bg=WHITE)
-                timeStartFrame.grid(row=4, column=0, sticky="we", padx=(0, 8))
+                timeStartFrame.grid(row=4, column=0, sticky="we", padx=(0, 4))
                 tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK,
                         font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
                 tStartBorder = tk.Frame(timeStartFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
@@ -1366,8 +1720,9 @@ class main(tk.Tk):
                                         relief="flat", bd=0)
                 timeStartEntry.pack(fill="x", padx=5, pady=3)
 
+                # ── TIME END (Column 1) ───────────────────────────────────────────
                 timeEndFrame = tk.Frame(midFrame, bg=WHITE)
-                timeEndFrame.grid(row=4, column=1, sticky="we", padx=(8, 0))
+                timeEndFrame.grid(row=4, column=1, sticky="we", padx=(4, 0))
                 tk.Label(timeEndFrame, text="Time End", bg=WHITE, fg=FG_DARK,
                         font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
                 tEndBorder = tk.Frame(timeEndFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
@@ -1381,7 +1736,60 @@ class main(tk.Tk):
                 tk.Button(bottomFrame, text="Save Schedule",
                         font=UNIFORM_FONT).pack(side="right", padx=(5, 0))
                 tk.Button(bottomFrame, text="Cancel", fg="#c0392b",
-                        font=UNIFORM_FONT).pack(side="right")
+                        font=UNIFORM_FONT, command=assign.destroy).pack(side="right")
+
+                err_label = tk.Label(assign, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
+                err_label.pack()
+
+                def confirm_assign():
+                    room  = roomSelection.get().strip()
+                    date  = dateEntry.get().strip()
+                    t_start = timeStartEntry.get().strip()
+                    t_end   = timeEndEntry.get().strip()
+
+                    if not room:
+                        err_label.config(text="Please select a room.")
+                        return
+                    if not date:
+                        err_label.config(text="Please enter a date.")
+                        return
+                    if not t_start or not t_end:
+                        err_label.config(text="Please enter both start and end times.")
+                        return
+
+                    try:
+                        con = sqlite3.connect(DB_NAME)
+                        cur = con.cursor()
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS cleaning_schedule (
+                                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                                cs_ID     VARCHAR(255),
+                                room      VARCHAR(255),
+                                date      VARCHAR(255),
+                                time_start VARCHAR(255),
+                                time_end  VARCHAR(255)
+                            )
+                        """)
+                        cur.execute(
+                            "INSERT INTO cleaning_schedule (cs_ID, room, date, time_start, time_end) VALUES (?, ?, ?, ?, ?)",
+                            (cs_ID.get(), room, date, t_start, t_end)
+                        )
+                        con.commit()
+                        con.close()
+                        messagebox.showinfo("Success", "Cleaning schedule assigned successfully.")
+                        assign.destroy()
+                    except Exception as e:
+                        err_label.config(text=f"Error: {e}")
+
+                bottomFrame = tk.Frame(assign, bg=content_color)
+                bottomFrame.pack(fill="x", padx=15, pady=15)
+                tk.Button(bottomFrame, text="Confirm",
+                        font=UNIFORM_FONT, bg=BLACK, fg=WHITE, relief="flat",
+                        padx=12, pady=5, cursor="hand2",
+                        command=confirm_assign).pack(side="right", padx=(5, 0))
+                tk.Button(bottomFrame, text="Cancel", fg="#c0392b",
+                        font=UNIFORM_FONT, relief="flat", padx=12, pady=5,
+                        cursor="hand2", command=assign.destroy).pack(side="right")
 
             # ── Top bar ───────────────────────────────────────────────────
             upperFrame = tk.Frame(page, bg=content_color)
@@ -1396,14 +1804,37 @@ class main(tk.Tk):
             card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
             card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
 
-            searchFrame = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            searchFrame.pack(fill="x", padx=16, pady=(14, 10))
-            tk.Label(searchFrame, text="🔍", bg=WHITE, fg=FG_MUTED,
+            #start of filter frame
+
+            filter_bar_staff = tk.Frame(card, bg=WHITE)
+            filter_bar_staff.pack(fill="x", padx=16, pady=(14, 10))
+
+            search_wrap_students = tk.Frame(filter_bar_staff, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            search_wrap_students.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+            tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
                     font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-            CSsearchEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK,
+            search_entry = tk.Entry(search_wrap_students, bg=WHITE,
                                     font=UNIFORM_FONT, relief="flat", bd=0,
                                     insertbackground=FG_DARK)
-            CSsearchEntry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+            search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+            searchFrame = tk.Frame(card, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            searchFrame.pack(fill="x", padx=16, pady=(14, 10))
+
+            # ── ADD THIS LINE BELOW YOUR ENTRY DEFINITION ─────────────────────
+            # "<KeyRelease>" triggers the search instantly with every keystroke typed
+            search_entry.bind("<KeyRelease>", search_staff)
+            
+            #wag muna burahin
+            # ── Search button ─────────────────────────────────────────────────────
+            # tk.Button(filter_bar_staff, text="Search", fg="BLACK", bg=content_color,
+            #         font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
+            #         cursor="hand2").pack(side="left", padx=(0, 16))
+
+            # ── Sort filter ─────────────────────────────────────────────────────
+            
+            
+            #end of frame of filters
 
             style = ttk.Style()
             style.theme_use("clam")
@@ -1461,13 +1892,131 @@ class main(tk.Tk):
                     anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
             self.db.get_all_cleaning_staff(self.cleaning_tree)
-
-
     # ── Settings page ─────────────────────────────────────────────────
     def build_settings_page(self, page):
-        tk.Label(page, text="FOR LOG OUT AND USER MANAGEMENT", bg=content_color,
-                 fg=font_color_sidebar, font=("Arial", 16, "bold")).pack(pady=20)
+        # ── Top bar ───────────────────────────────────────────────────────
+        topbar = tk.Frame(page, bg=content_color)
+        topbar.pack(fill="x", padx=28, pady=(20, 12))
+        tk.Label(topbar, text="Settings", bg=content_color, fg=FG_DARK,
+                font=("Segoe UI", 17, "bold")).pack(side="left")
 
+        # ── Card ──────────────────────────────────────────────────────────
+        card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
+
+        # ── Section title ─────────────────────────────────────────────────
+        tk.Label(card, text="Admin Accounts", bg=WHITE, fg=FG_DARK,
+                font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16)
+
+        # ── Treeview ──────────────────────────────────────────────────────
+        tree_frame = tk.Frame(card, bg=WHITE)
+        tree_frame.pack(fill="both", expand=True, padx=16, pady=(10, 0))
+
+        style = ttk.Style()
+        style.configure("Settings.Treeview", background=WHITE, foreground=FG_DARK,
+                        rowheight=34, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
+        style.configure("Settings.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+                        font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
+        style.map("Settings.Treeview",
+                background=[("selected", ROW_SEL)],
+                foreground=[("selected", FG_DARK)])
+        style.layout("Settings.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+        self.settings_tree = ttk.Treeview(tree_frame, columns=("username", "password"),
+                                        show="headings", style="Settings.Treeview",
+                                        selectmode="browse", height=6)
+        self.settings_tree.heading("username", text="Username", anchor="w")
+        self.settings_tree.heading("password", text="Password", anchor="w")
+        self.settings_tree.column("username", width=220, anchor="w", stretch=True)
+        self.settings_tree.column("password", width=220, anchor="w", stretch=True)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.settings_tree.yview)
+        self.settings_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.settings_tree.pack(side="left", fill="both", expand=True)
+
+        # ── Entry fields ──────────────────────────────────────────────────
+        fields_frame = tk.Frame(card, bg=WHITE)
+        fields_frame.pack(fill="x", padx=16, pady=(14, 0))
+        fields_frame.columnconfigure(0, weight=1)
+        fields_frame.columnconfigure(1, weight=1)
+
+        tk.Label(fields_frame, text="Username", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+        tk.Label(fields_frame, text="Password", bg=WHITE, fg=FG_DARK,
+                font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
+
+        user_border = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        user_border.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+        user_entry = tk.Entry(user_border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                            relief="flat", bd=0, insertbackground=FG_DARK)
+        user_entry.pack(fill="x", padx=5, pady=4)
+
+        pass_border = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+        pass_border.grid(row=1, column=1, sticky="we", pady=(0, 12))
+        pass_entry = tk.Entry(pass_border, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                            relief="flat", bd=0, insertbackground=FG_DARK, show="*")
+        pass_entry.pack(fill="x", padx=5, pady=4)
+
+        # ── Populate entries on row select ────────────────────────────────
+        def on_select(event):
+            selected = self.settings_tree.focus()
+            if selected:
+                values = self.settings_tree.item(selected, "values")
+                user_entry.delete(0, "end")
+                pass_entry.delete(0, "end")
+                user_entry.insert(0, values[0])
+                pass_entry.insert(0, values[1])
+
+        self.settings_tree.bind("<ButtonRelease-1>", on_select)
+
+        # ── Action buttons ────────────────────────────────────────────────
+        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(0, 0))
+
+        btn_bar = tk.Frame(card, bg=WHITE)
+        btn_bar.pack(fill="x", padx=16, pady=10)
+
+        def add_user():
+            username = user_entry.get().strip()
+            password = pass_entry.get().strip()
+            if not username or not password:
+                return
+            self.settings_tree.insert("", "end", values=(username, password))
+            user_entry.delete(0, "end")
+            pass_entry.delete(0, "end")
+
+        def edit_user():
+            selected = self.settings_tree.focus()
+            if not selected:
+                return
+            username = user_entry.get().strip()
+            password = pass_entry.get().strip()
+            if not username or not password:
+                return
+            self.settings_tree.item(selected, values=(username, password))
+
+        def delete_user():
+            selected = self.settings_tree.focus()
+            if not selected:
+                return
+            self.settings_tree.delete(selected)
+            user_entry.delete(0, "end")
+            pass_entry.delete(0, "end")
+
+        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+                    relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+        tk.Button(btn_bar, text="＋  Add",    command=add_user,    **btn_cfg).pack(side="left", padx=(0, 6))
+        tk.Button(btn_bar, text="✏  Edit",   command=edit_user,   **btn_cfg).pack(side="left", padx=6)
+        tk.Button(btn_bar, text="🗑  Delete", command=delete_user,
+                bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
+                relief="solid", bd=1, padx=14, pady=5,
+                cursor="hand2").pack(side="left", padx=6)
+        
+        tk.Button(btn_bar, text="⏻  Log Out",
+                bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
+                relief="flat", padx=14, pady=5, cursor="hand2",
+                command=self.destroy).pack(side="right")    
 
 if __name__ == "__main__":
     app = main()
