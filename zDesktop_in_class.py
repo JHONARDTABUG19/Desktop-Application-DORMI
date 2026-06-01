@@ -268,20 +268,14 @@ class Database:
     def remove_student_from_room(self, student_no):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            # Get the student's current room and building first
             cursor.execute("SELECT room, building FROM students WHERE student_no=?", (student_no,))
             row = cursor.fetchone()
-            if row and row[0] and row[1]:  # only if they have a room assigned
+            if row and row[0] and row[1]:
                 room, building = row
-                cursor.execute("""
-                    UPDATE rooms SET occupants = MAX(0, occupants - 1)
-                    WHERE room_number=? AND building=?
-                """, (room, building))
-                # Set back to Vacant if occupants dropped below capacity
-                cursor.execute("""
-                    UPDATE rooms SET status='Vacant'
-                    WHERE room_number=? AND building=? AND occupants < capacity AND status='Occupied'
-                """, (room, building))
+                cursor.execute("""UPDATE rooms SET occupants = MAX(0, occupants - 1)WHERE room_number=? AND building=?""", (room, building))
+                cursor.execute("""UPDATE rooms SET status='Vacant'WHERE room_number=? AND building=? AND occupants < capacity AND status='Occupied'""", (room, building))
+                cursor.execute("""UPDATE students SET room='', building='' WHERE student_no=?""", (student_no,))
+                
             connect.commit()
 
         
@@ -400,6 +394,22 @@ class main(tk.Tk):
         self.Settings.config(       command=lambda: self.show_page(self.settings_page,  self.Settings))
 
         self.show_page(self.dashboard_page, self.dashboardButton)
+
+        hover_color = "#BE9C7C"   # lighter than active_color, darker than sidebar_color
+
+        def bind_hover(btn):
+            def on_enter(e):
+                if btn.cget("bg") != active_color:   # don't override the active button
+                    btn.config(bg=hover_color)
+            def on_leave(e):
+                if btn.cget("bg") != active_color:
+                    btn.config(bg=sidebar_color)
+            btn.bind("<Enter>", on_enter)
+            btn.bind("<Leave>", on_leave)
+
+        for btn in self.all_buttons:
+            bind_hover(btn)
+
     
     #updating dashboard numbers after changes in students and rooms pages
     def refresh_dashboard(self):                          
@@ -701,6 +711,7 @@ class main(tk.Tk):
                 self.db.remove_student_from_room(student_no)   # ← add this line
                 self.db.delete_student(student_no)
                 self.tree.delete(selected[0])
+                self.db.get_all_rooms(self.rooms_tree)
                 update_count()
                 self.refresh_dashboard()
 
@@ -898,7 +909,7 @@ class main(tk.Tk):
         style.theme_use("clam")
         style.configure("Students.Treeview", background=WHITE, foreground=FG_DARK,
                         rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-        style.configure("Students.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+        style.configure("Students.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
         style.map("Students.Treeview",
                   background=[("selected", ROW_SEL)],
@@ -1055,7 +1066,7 @@ class main(tk.Tk):
         style.theme_use("clam")
         style.configure("Rooms.Treeview", background=WHITE, foreground=FG_DARK,
                         rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-        style.configure("Rooms.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+        style.configure("Rooms.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
         style.map("Rooms.Treeview",
                   background=[("selected", ROW_SEL)],
@@ -1749,7 +1760,7 @@ class main(tk.Tk):
             style.theme_use("clam")
             style.configure("CleaningStaff.Treeview", background=WHITE, foreground=FG_DARK,
                             rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-            style.configure("CleaningStaff.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+            style.configure("CleaningStaff.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                             font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
             style.map("CleaningStaff.Treeview",
                     background=[("selected", ROW_SEL)],
@@ -1825,7 +1836,7 @@ class main(tk.Tk):
         style = ttk.Style()
         style.configure("Settings.Treeview", background=WHITE, foreground=FG_DARK,
                         rowheight=34, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-        style.configure("Settings.Treeview.Heading", background=HEADER_BG, foreground="#555577",
+        style.configure("Settings.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
         style.map("Settings.Treeview",
                 background=[("selected", ROW_SEL)],
