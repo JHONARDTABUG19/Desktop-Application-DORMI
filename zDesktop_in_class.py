@@ -892,18 +892,7 @@ class main(tk.Tk):
                   cursor="hand2").pack(side="left", padx=(0, 16))
 
         # ── Sort filter ─────────────────────────────────────────────────────
-        tk.Label(filter_bar_students, text="Sort By:", bg=WHITE, fg=FG_DARK,
-                font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
-        course_var = tk.StringVar(value="")
-        course_drop = ttk.Combobox(filter_bar_students, textvariable=course_var,
-                                values=["Name", "Course", "Room"],
-                                state="readonly", font=UNIFORM_FONT, width=10)
-        course_drop.pack(side="left", padx=(0, 12))
-        
-        # ── Apply Filters button ──────────────────────────────────────────────
-        tk.Button(filter_bar_students, text="Apply", fg="BLACK", bg=content_color,
-                font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                cursor="hand2").pack(side="left")
+       
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -1048,18 +1037,7 @@ class main(tk.Tk):
                   cursor="hand2").pack(side="left", padx=(0, 16))
 
         # ── Sort filter ─────────────────────────────────────────────────────
-        tk.Label(filter_bar_rooms, text="Sort By:", bg=WHITE, fg=FG_DARK,
-                font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
-        course_var = tk.StringVar(value="")
-        course_drop = ttk.Combobox(filter_bar_rooms, textvariable=course_var,
-                                values=["Room No.","Building", "Occupants"],
-                                state="readonly", font=UNIFORM_FONT, width=10)
-        course_drop.pack(side="left", padx=(0, 12))
         
-        # ── Apply Filters button ──────────────────────────────────────────────
-        tk.Button(filter_bar_rooms, text="Apply", fg="BLACK", bg=content_color,
-                font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                cursor="hand2").pack(side="left")
         
         #end of frame of filters
 
@@ -1763,18 +1741,7 @@ class main(tk.Tk):
                     cursor="hand2").pack(side="left", padx=(0, 16))
 
             # ── Sort filter ─────────────────────────────────────────────────────
-            tk.Label(filter_bar_staff, text="Sort By:", bg=WHITE, fg=FG_DARK,
-                    font=UNIFORM_FONT).pack(side="left", padx=(0, 4))
-            course_var = tk.StringVar(value="")
-            course_drop = ttk.Combobox(filter_bar_staff, textvariable=course_var,
-                                    values=["Name", "Rooms"],
-                                    state="readonly", font=UNIFORM_FONT, width=10)
-            course_drop.pack(side="left", padx=(0, 12))
             
-            # ── Apply Filters button ──────────────────────────────────────────────
-            tk.Button(filter_bar_staff, text="Apply", fg="BLACK", bg=content_color,
-                    font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                    cursor="hand2").pack(side="left")
             
             #end of frame of filters
 
