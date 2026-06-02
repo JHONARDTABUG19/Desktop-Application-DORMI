@@ -221,6 +221,31 @@ class Database:
 
 
 
+    def seed_sample_students(self):
+        """Insert sample students for testing if the table is empty."""
+        with sqlite3.connect(DB_NAME) as connect:
+            cursor = connect.cursor()
+            cursor.execute("SELECT COUNT(*) FROM students")
+            if cursor.fetchone()[0] > 0:
+                return  # already has data, skip seeding
+            sample = [
+                ("2021-00001", "Reyes",     "Maria",     "S", "BSCS",  "Active",   "09171234567"),
+                ("2021-00002", "Santos",    "Juan",      "D", "BSIT",  "Active",   "09189876543"),
+                ("2021-00003", "Dela Cruz", "Anna",      "L", "BSN",   "Active",   "09201112222"),
+                ("2021-00004", "Garcia",    "Carlo",     "M", "BSEE",  "Inactive", "09333334444"),
+                ("2021-00005", "Torres",    "Patricia",  "R", "BSME",  "On Leave", "09455556666"),
+                ("2022-00001", "Villanueva","Miguel",    "A", "BSCS",  "Active",   "09567778888"),
+                ("2022-00002", "Castillo",  "Sophia",   "B", "BSIT",  "Active",   "09689990000"),
+                ("2022-00003", "Morales",   "Andres",   "C", "BSCE",  "Active",   "09701231234"),
+                ("2022-00004", "Navarro",   "Isabella", "P", "BSN",   "Inactive", "09823454567"),
+                ("2022-00005", "Mendoza",   "Luis",     "T", "BSBA",  "Active",   "09945677890"),
+            ]
+            cursor.executemany(
+                "INSERT OR IGNORE INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(s[0], s[1], s[2], s[3], s[4], s[5], s[6], "", "") for s in sample]
+            )
+            connect.commit()
+
     def migrate_students_table(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -302,6 +327,7 @@ class main(tk.Tk):
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
         self.db.migrate_students_table()
+        self.db.seed_sample_students()
         
         
         
@@ -896,10 +922,57 @@ class main(tk.Tk):
         search_entry.insert(0, "Search by ID or Name...")
         search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
 
+        def on_search_focus_in(e):
+            if search_entry.get() == "Search by ID or Name...":
+                search_entry.delete(0, "end")
+                search_entry.config(fg=FG_DARK)
+
+        def on_search_focus_out(e):
+            if not search_entry.get().strip():
+                search_entry.insert(0, "Search by ID or Name...")
+                search_entry.config(fg=FG_MUTED)
+
+        search_entry.bind("<FocusIn>",  on_search_focus_in)
+        search_entry.bind("<FocusOut>", on_search_focus_out)
+
+        def do_search():
+            query = search_entry.get().strip().lower()
+            if query == "search by id or name...":
+                query = ""
+            for row in self.tree.get_children():
+                self.tree.delete(row)
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                cur.execute("""
+                    SELECT student_no,
+                        TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name),
+                        program, contact, building, room, status
+                    FROM students
+                    WHERE LOWER(student_no) LIKE ? OR LOWER(first_name || ' ' || last_name) LIKE ?
+                """, (f"%{query}%", f"%{query}%"))
+                for row in cur.fetchall():
+                    self.tree.insert("", "end", values=row)
+            update_count()
+
+        def clear_search_students():
+            search_entry.delete(0, "end")
+            search_entry.insert(0, "Search by ID or Name...")
+            search_entry.config(fg=FG_MUTED)
+            self.db.get_all_students(self.tree)
+            update_count()
+
+        # ── X clear button inside search box ──────────────────────────────
+        clear_btn_students = tk.Label(search_wrap_students, text="✕", bg=WHITE, fg=FG_MUTED,
+                                      font=("Segoe UI", 9), cursor="hand2")
+        clear_btn_students.pack(side="right", padx=(2, 6))
+        clear_btn_students.bind("<Button-1>", lambda e: clear_search_students())
+
+        search_entry.bind("<Return>", lambda e: do_search())
+
         # ── Search button ─────────────────────────────────────────────────────
         tk.Button(filter_bar_students, text="Search", fg="BLACK", bg=content_color,
                   font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                  cursor="hand2").pack(side="left", padx=(0, 16))
+                  cursor="hand2", command=do_search).pack(side="left", padx=(0, 16))
 
         # ── Sort filter ─────────────────────────────────────────────────────
        
@@ -972,6 +1045,7 @@ class main(tk.Tk):
                  anchor="w").pack(fill="x", padx=20, pady=(0, 10))
     
         self.db.get_all_students(self.tree) #loading the treeview with the students from the database
+        update_count()
 
     # ── Rooms page ────────────────────────────────────────────────────
     def build_rooms_page(self, page):
@@ -1035,16 +1109,60 @@ class main(tk.Tk):
 
         tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
                 font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-        search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
+        rooms_search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
                                 font=UNIFORM_FONT, relief="flat", bd=0,
                                 insertbackground=FG_DARK)
-        search_entry.insert(0, "Search by ID or Name...")
-        search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+        rooms_search_entry.insert(0, "Search by Room No. or Building...")
+        rooms_search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+        def on_rooms_focus_in(e):
+            if rooms_search_entry.get() == "Search by Room No. or Building...":
+                rooms_search_entry.delete(0, "end")
+                rooms_search_entry.config(fg=FG_DARK)
+
+        def on_rooms_focus_out(e):
+            if not rooms_search_entry.get().strip():
+                rooms_search_entry.insert(0, "Search by Room No. or Building...")
+                rooms_search_entry.config(fg=FG_MUTED)
+
+        rooms_search_entry.bind("<FocusIn>",  on_rooms_focus_in)
+        rooms_search_entry.bind("<FocusOut>", on_rooms_focus_out)
+
+        def do_rooms_search():
+            query = rooms_search_entry.get().strip().lower()
+            if query == "search by room no. or building...":
+                query = ""
+            for row in self.rooms_tree.get_children():
+                self.rooms_tree.delete(row)
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                cur.execute("""
+                    SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned
+                    FROM rooms
+                    WHERE LOWER(room_number) LIKE ? OR LOWER(building) LIKE ?
+                """, (f"%{query}%", f"%{query}%"))
+                for row in cur.fetchall():
+                    room_id = row[0]
+                    values  = row[1:]
+                    self.rooms_tree.insert("", "end", values=values, tags=(room_id,))
+
+        def clear_rooms_search():
+            rooms_search_entry.delete(0, "end")
+            rooms_search_entry.insert(0, "Search by Room No. or Building...")
+            rooms_search_entry.config(fg=FG_MUTED)
+            self.db.get_all_rooms(self.rooms_tree)
+
+        rooms_clear_btn = tk.Label(search_wrap_students, text="✕", bg=WHITE, fg=FG_MUTED,
+                                   font=("Segoe UI", 9), cursor="hand2")
+        rooms_clear_btn.pack(side="right", padx=(2, 6))
+        rooms_clear_btn.bind("<Button-1>", lambda e: clear_rooms_search())
+
+        rooms_search_entry.bind("<Return>", lambda e: do_rooms_search())
 
         # ── Search button ─────────────────────────────────────────────────────
         tk.Button(filter_bar_rooms, text="Search", fg="BLACK", bg=content_color,
                   font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                  cursor="hand2").pack(side="left", padx=(0, 16))
+                  cursor="hand2", command=do_rooms_search).pack(side="left", padx=(0, 16))
 
         # ── Sort filter ─────────────────────────────────────────────────────
         
@@ -1055,11 +1173,25 @@ class main(tk.Tk):
         filter_frame.pack(fill="x", padx=16, pady=(0, 8))
         tk.Label(filter_frame, text="Filter:", bg=WHITE, fg=FG_MUTED,
                  font=("Segoe UI", 9)).pack(side="left", padx=(0, 6))
-        for label, color in [("All", FG_DARK), ("Vacant", "#27ae60"),
-                              ("Occupied", "#8e44ad"), ("Maintenance", "#e67e22")]:
+
+        def filter_rooms_by_status(status_filter):
+            for row in self.rooms_tree.get_children():
+                self.rooms_tree.delete(row)
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                if status_filter == "All":
+                    cur.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms")
+                else:
+                    cur.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms WHERE status=?", (status_filter,))
+                for row in cur.fetchall():
+                    self.rooms_tree.insert("", "end", values=row[1:], tags=(row[0],))
+
+        for label, color, status_val in [("All", FG_DARK, "All"), ("Vacant", "#27ae60", "Vacant"),
+                              ("Occupied", "#8e44ad", "Occupied"), ("Maintenance", "#e67e22", "Under Maintenance")]:
             tk.Button(filter_frame, text=label, bg=WHITE, fg=color,
                       font=("Segoe UI", 8), relief="solid", bd=1,
-                      padx=10, pady=3, cursor="hand2").pack(side="left", padx=3)
+                      padx=10, pady=3, cursor="hand2",
+                      command=lambda s=status_val: filter_rooms_by_status(s)).pack(side="left", padx=3)
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -1739,16 +1871,57 @@ class main(tk.Tk):
 
             tk.Label(search_wrap_students, text="🔍", bg=WHITE, fg=FG_MUTED,
                     font=UNIFORM_FONT).pack(side="left", padx=(8, 2), pady=6)
-            search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
-                                    font=UNIFORM_FONT, relief="flat", bd=0,
-                                    insertbackground=FG_DARK)
-            search_entry.insert(0, "Search by ID or Name...")
-            search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+            cs_search_entry = tk.Entry(search_wrap_students, bg=WHITE, fg=FG_MUTED,
+                                        font=UNIFORM_FONT, relief="flat", bd=0,
+                                        insertbackground=FG_DARK)
+            cs_search_entry.insert(0, "Search by ID or Name...")
+            cs_search_entry.pack(side="left", fill="x", expand=True, pady=7, padx=4)
+
+            def on_cs_focus_in(e):
+                if cs_search_entry.get() == "Search by ID or Name...":
+                    cs_search_entry.delete(0, "end")
+                    cs_search_entry.config(fg=FG_DARK)
+
+            def on_cs_focus_out(e):
+                if not cs_search_entry.get().strip():
+                    cs_search_entry.insert(0, "Search by ID or Name...")
+                    cs_search_entry.config(fg=FG_MUTED)
+
+            cs_search_entry.bind("<FocusIn>",  on_cs_focus_in)
+            cs_search_entry.bind("<FocusOut>", on_cs_focus_out)
+
+            def do_cs_search():
+                query = cs_search_entry.get().strip().lower()
+                if query == "search by id or name...":
+                    query = ""
+                for row in self.cleaning_tree.get_children():
+                    self.cleaning_tree.delete(row)
+                with sqlite3.connect(DB_NAME) as con:
+                    cur = con.cursor()
+                    cur.execute("""
+                        SELECT cs_ID, full_name, contact, email FROM cleaningStaff
+                        WHERE LOWER(cs_ID) LIKE ? OR LOWER(full_name) LIKE ?
+                    """, (f"%{query}%", f"%{query}%"))
+                    for row in cur.fetchall():
+                        self.cleaning_tree.insert("", "end", values=row)
+
+            def clear_cs_search():
+                cs_search_entry.delete(0, "end")
+                cs_search_entry.insert(0, "Search by ID or Name...")
+                cs_search_entry.config(fg=FG_MUTED)
+                self.db.get_all_cleaning_staff(self.cleaning_tree)
+
+            cs_clear_btn = tk.Label(search_wrap_students, text="✕", bg=WHITE, fg=FG_MUTED,
+                                    font=("Segoe UI", 9), cursor="hand2")
+            cs_clear_btn.pack(side="right", padx=(2, 6))
+            cs_clear_btn.bind("<Button-1>", lambda e: clear_cs_search())
+
+            cs_search_entry.bind("<Return>", lambda e: do_cs_search())
 
             # ── Search button ─────────────────────────────────────────────────────
             tk.Button(filter_bar_staff, text="Search", fg="BLACK", bg=content_color,
                     font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
-                    cursor="hand2").pack(side="left", padx=(0, 16))
+                    cursor="hand2", command=do_cs_search).pack(side="left", padx=(0, 16))
 
             # ── Sort filter ─────────────────────────────────────────────────────
             
