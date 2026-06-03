@@ -1314,8 +1314,10 @@ class main(tk.Tk):
 
             roomNumBorder = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
             roomNumBorder.grid(row=1, column=1, sticky="we", pady=(0, 12))
+            vcmd = (win.register(lambda P: P.isdigit() or P == ""), "%P")
             roomNumEntry = tk.Entry(roomNumBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK)
+                        relief="flat", bd=0, insertbackground=FG_DARK,
+                        validate="key", validatecommand=vcmd)
             roomNumEntry.pack(fill="x", padx=5, pady=3)
 
 
