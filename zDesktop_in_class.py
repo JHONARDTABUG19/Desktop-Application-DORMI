@@ -2015,8 +2015,13 @@ class main(tk.Tk):
                 with sqlite3.connect(DB_NAME) as con:
                     cur = con.cursor()
                     cur.execute("""
-                        SELECT cs_ID, full_name, contact, email FROM cleaningStaff
-                        WHERE LOWER(cs_ID) LIKE ? OR LOWER(full_name) LIKE ?
+                        SELECT cs.cs_ID, cs.full_name, cs.contact, cs.email, 
+                               COALESCE(sch.building, '—'), COALESCE(sch.room, '—'), 
+                               COALESCE(sch.time_start, '—'), COALESCE(sch.time_end, '—'),
+                               COALESCE(sch.month || '/' || sch.day || '/' || sch.year, '—')
+                        FROM cleaningStaff cs
+                        LEFT JOIN cleaning_schedule sch ON cs.cs_ID = sch.cs_ID
+                        WHERE LOWER(cs.cs_ID) LIKE ? OR LOWER(cs.full_name) LIKE ?
                     """, (f"%{query}%", f"%{query}%"))
                     for row in cur.fetchall():
                         self.cleaning_tree.insert("", "end", values=row)
