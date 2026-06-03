@@ -729,7 +729,7 @@ class main(tk.Tk):
         def delete_student():
             selected = self.tree.selection()
             if not selected:
-                messagebox_info("Select a student first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
                 return
             if messagebox_confirm("Delete this student? This cannot be undone."):
                 student_no = self.tree.item(selected[0], "values")[0]
@@ -743,7 +743,7 @@ class main(tk.Tk):
         def edit_student():
             selected = self.tree.selection()
             if not selected:
-                messagebox_info("Select a student first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
                 return
             values = self.tree.item(selected[0], "values")
             add_student_window(prefill=values, edit_item=selected[0])
@@ -751,7 +751,7 @@ class main(tk.Tk):
         def assign_room():
             selected = self.tree.selection()
             if not selected:
-                messagebox_info("Select a student first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
                 return
             values = self.tree.item(selected[0], "values")
 
@@ -1365,10 +1365,12 @@ class main(tk.Tk):
                       cursor="hand2", command=win.destroy).pack(side="right")
 
         def delete_room():
+
             selected = self.rooms_tree.selection()
             if not selected:
-                rooms_messagebox("Select a room first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a room from the table first.")
                 return
+
             if rooms_messagebox_confirm("Delete this room? This cannot be undone."):
                 room_id = self.rooms_tree.item(selected[0], "tags")[0]
                 self.db.delete_room(room_id)
@@ -1379,7 +1381,7 @@ class main(tk.Tk):
         def edit_room():
             selected = self.rooms_tree.selection()
             if not selected:
-                rooms_messagebox("Select a room first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a room from the table first.")
                 return
             values = self.rooms_tree.item(selected[0], "values")
             # values = (room_no, building, type, capacity, occupants, status, last_cleaned)
@@ -1388,7 +1390,7 @@ class main(tk.Tk):
         def view_room_details():
             selected = self.rooms_tree.selection()
             if not selected:
-                rooms_messagebox("Select a room first.", "No Selection")
+                messagebox.showwarning("Selection Required", "Please click a room from the table first.")
                 return
             values = self.rooms_tree.item(selected[0], "values")
 
@@ -1461,6 +1463,19 @@ class main(tk.Tk):
             contact   = tk.StringVar()
             full_name = tk.StringVar()
 
+            def validate_int(P):
+                # Allow empty input so users can delete characters
+                if P == "":
+                    return True
+                # Check if the entire string consists only of numbers
+                return P.isdigit()
+
+            def validate_str(P):
+                if P == "":
+                    return True
+                return P.isalpha() or P.isspace()
+
+
             def addCleaningStaff():
                 addStaff = tk.Toplevel()
                 addStaff.title("Add Cleaning Staff")
@@ -1468,6 +1483,9 @@ class main(tk.Tk):
                 addStaff.geometry("500x360")
                 addStaff.resizable(False, False)
                 addStaff.grab_set()
+
+                vcmd_int = addStaff.register(validate_int)
+                vcmd_str = addStaff.register(validate_str)
 
                 def save_staff():
                     id_val       = idEntry.get().strip()
@@ -1517,6 +1535,7 @@ class main(tk.Tk):
                 lnBorder = tk.Frame(lnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 lnBorder.pack(fill="x")
                 LN_Entry = tk.Entry(lnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    validate="key", validatecommand=(vcmd_str, "%P"),
                                     relief="flat", bd=0, insertbackground=FG_DARK)
                 LN_Entry.pack(fill="x", padx=5, pady=4)
 
@@ -1527,6 +1546,7 @@ class main(tk.Tk):
                 fnBorder = tk.Frame(fnGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 fnBorder.pack(fill="x")
                 FN_Entry = tk.Entry(fnBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    validate="key", validatecommand=(vcmd_str, "%P"),
                                     relief="flat", bd=0, insertbackground=FG_DARK)
                 FN_Entry.pack(fill="x", padx=5, pady=4)
 
@@ -1537,6 +1557,7 @@ class main(tk.Tk):
                 miBorder = tk.Frame(miGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 miBorder.pack()
                 MI_Entry = tk.Entry(miBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                    validate="key", validatecommand=(vcmd_str, "%P"),
                                     relief="flat", bd=0, insertbackground=FG_DARK, width=3)
                 MI_Entry.pack(padx=5, pady=4)
 
@@ -1557,6 +1578,7 @@ class main(tk.Tk):
                 contactBorder = tk.Frame(contactGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 contactBorder.pack(fill="x")
                 contactEntry = tk.Entry(contactBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                        validate="key", validatecommand=(vcmd_int, "%P"),
                                         relief="flat", bd=0, insertbackground=FG_DARK)
                 contactEntry.pack(fill="x", padx=5, pady=4)
 
@@ -1617,6 +1639,8 @@ class main(tk.Tk):
                     except Exception as e:
                         messagebox.showerror("Database Modification Error", 
                                             f"Failed execution block.\nCheck if 'edit_cleaning_stuff' matches your helper method name exactly.\n\nError details: {e}")
+
+
 
                 upperFrame = tk.Frame(editStaff, bg=content_color)
                 upperFrame.pack(fill="x", padx=15, pady=12)
@@ -1741,10 +1765,15 @@ class main(tk.Tk):
                         messagebox.showerror("Database Error", f"Failed to execute row deletion:\n{e}")
 
             def CSassign_window():
+                selected_id = cs_ID.get()
+                if not selected_id:
+                    messagebox.showwarning("Selection Required", "Please click a cleaning staff record from the table first.")
+                    return
+                 
                 assign = tk.Toplevel()
                 assign.title("Assign Cleaning")
                 assign.config(bg=content_color)
-                assign.geometry("420x360")
+                assign.geometry("420x380") # Increased slightly to 380 height to give your elements breathing room at the bottom
                 assign.resizable(False, False)
                 assign.grab_set()
 
@@ -1756,61 +1785,115 @@ class main(tk.Tk):
                 midFrame = tk.Frame(assign, bg=WHITE, padx=15, pady=15,
                                     bd=1, relief="solid", highlightbackground=BORDER)
                 midFrame.pack(fill="both", expand=True, padx=15, pady=5)
-                midFrame.columnconfigure(0, weight=1)
-                midFrame.columnconfigure(1, weight=1)
+                
+                # ── UNIFIED 6-COLUMN GRID CONFIGURATION ───────────────────────
+                # This ensures every single column has the exact same baseline width
+                for col in range(6):
+                    midFrame.columnconfigure(col, weight=1, uniform="grid_row")
 
+                vcmd_int = midFrame.register(validate_int)
+
+                # ── ROW 0 & 1: BUILDING & ROOM DROPDOWNS (3 Columns Each) ──────
+                # Building Layout (Cols 0-2)
+                tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
+                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
+                buildingSelection = tk.StringVar()
+                buildingOptions = ["Building A", "Building B", "Building C"]
+                buildingDropdown = ttk.Combobox(midFrame, textvariable=buildingSelection, values=buildingOptions,
+                                                state="readonly", font=UNIFORM_FONT)
+                buildingDropdown.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 12), padx=(0, 6))
+                buildingDropdown.current(0)
+
+                # Room Layout (Cols 3-5)
                 tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
-                        font=UNIFORM_FONT).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 2))
+                        font=UNIFORM_FONT).grid(row=0, column=3, columnspan=3, sticky="w", pady=(0, 2), padx=(6, 0))
                 roomSelection = tk.StringVar()
                 rooms = self.db.collect_room()
                 roomOptions = rooms if rooms else ["No rooms available"]
                 roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=roomOptions,
                                             state="readonly", font=UNIFORM_FONT)
-                roomDropdown.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 12))
+                roomDropdown.grid(row=1, column=3, columnspan=3, sticky="we", pady=(0, 12), padx=(6, 0))
                 roomDropdown.current(0)
 
-                tk.Label(midFrame, text="Date", bg=WHITE, fg=FG_DARK,
-                        font=UNIFORM_FONT).grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 2))
-                searchFrame = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-                searchFrame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 12))
-                dateEntry = tk.Entry(searchFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                    relief="flat", bd=0, insertbackground=FG_DARK)
-                dateEntry.pack(fill="x", padx=5, pady=3)
 
+                # ── ROW 2 & 3: CALENDAR GROUP (2 Columns Each - Makes them smaller) ──
+                # Month Entry (Cols 0-1)
+                monthGroup = tk.Frame(midFrame, bg=WHITE)
+                monthGroup.grid(row=2, column=0, columnspan=2, sticky="we", padx=(0, 4), pady=(0, 12))
+                tk.Label(monthGroup, text="Month", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                monthBorder = tk.Frame(monthGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                monthBorder.pack(fill="x")
+                Month_Entry = tk.Entry(monthBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                       validate="key", validatecommand=(vcmd_int, "%P"), relief="flat", bd=0, insertbackground=FG_DARK)
+                Month_Entry.pack(fill="x", padx=5, pady=4)
+
+                # Day Entry (Cols 2-3)
+                dayGroup = tk.Frame(midFrame, bg=WHITE)
+                dayGroup.grid(row=2, column=2, columnspan=2, sticky="we", padx=4, pady=(0, 12))
+                tk.Label(dayGroup, text="Day", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                dayBorder = tk.Frame(dayGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                dayBorder.pack(fill="x")
+                Day_Entry = tk.Entry(dayBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                     validate="key", validatecommand=(vcmd_int, "%P"), relief="flat", bd=0, insertbackground=FG_DARK)
+                Day_Entry.pack(fill="x", padx=5, pady=4)
+
+                # Year Entry (Cols 4-5)
+                yearGroup = tk.Frame(midFrame, bg=WHITE)
+                yearGroup.grid(row=2, column=4, columnspan=2, sticky="we", padx=(4, 0), pady=(0, 12))
+                tk.Label(yearGroup, text="Year", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                yearBorder = tk.Frame(yearGroup, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+                yearBorder.pack(fill="x")
+                Year_Entry = tk.Entry(yearBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                      validate="key", validatecommand=(vcmd_int, "%P"), relief="flat", bd=0, insertbackground=FG_DARK)
+                Year_Entry.pack(fill="x", padx=5, pady=4)
+
+
+                # ── ROW 4: TIME SELECTION DROPDOWNS (3 Columns Each) ──────────
+                timeOptions = [
+                    "07:00 AM", "07:30 AM", "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
+                    "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+                    "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
+                    "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM",
+                    "07:00 PM", "07:30 PM", "08:00 PM", "08:30 PM", "09:00 PM"
+                ]
+
+                # Time Start (Cols 0-2)
                 timeStartFrame = tk.Frame(midFrame, bg=WHITE)
-                timeStartFrame.grid(row=4, column=0, sticky="we", padx=(0, 8))
-                tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK,
-                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-                tStartBorder = tk.Frame(timeStartFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-                tStartBorder.pack(fill="x")
-                timeStartEntry = tk.Entry(tStartBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                        relief="flat", bd=0)
-                timeStartEntry.pack(fill="x", padx=5, pady=3)
+                timeStartFrame.grid(row=4, column=0, columnspan=3, sticky="we", padx=(0, 6))
+                tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                timeStartSelection = tk.StringVar()
+                timeStartDropdown = ttk.Combobox(timeStartFrame, textvariable=timeStartSelection, 
+                                                 values=timeOptions, state="readonly", font=UNIFORM_FONT)
+                timeStartDropdown.pack(fill="x", ipady=1)
+                timeStartDropdown.current(2)
 
+                # Time End (Cols 3-5)
                 timeEndFrame = tk.Frame(midFrame, bg=WHITE)
-                timeEndFrame.grid(row=4, column=1, sticky="we", padx=(8, 0))
-                tk.Label(timeEndFrame, text="Time Should End", bg=WHITE, fg=FG_DARK,
-                        font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-                tEndBorder = tk.Frame(timeEndFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-                tEndBorder.pack(fill="x")
-                timeEndEntry = tk.Entry(tEndBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                                        relief="flat", bd=0)
-                timeEndEntry.pack(fill="x", padx=5, pady=3)
+                timeEndFrame.grid(row=4, column=3, columnspan=3, sticky="we", padx=(6, 0))
+                tk.Label(timeEndFrame, text="Time Should End", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                timeEndSelection = tk.StringVar()
+                timeEndDropdown = ttk.Combobox(timeEndFrame, textvariable=timeEndSelection, 
+                                               values=timeOptions, state="readonly", font=UNIFORM_FONT)
+                timeEndDropdown.pack(fill="x", ipady=1)
+                timeEndDropdown.current(4)
 
+                # ── BOTTOM ERROR LABEL AREA ───────────────────────────────────
                 err_label = tk.Label(assign, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
-                err_label.pack()
+                err_label.pack(pady=(2, 0))
 
                 def confirm_assign():
                     room  = roomSelection.get().strip()
-                    date  = dateEntry.get().strip()
-                    t_start = timeStartEntry.get().strip()
-                    t_end   = timeEndEntry.get().strip()
+                    month = Month_Entry.get().strip()
+                    day   = Day_Entry.get().strip()
+                    year  = Year_Entry.get().strip()
+                    t_start = timeStartSelection.get().strip()
+                    t_end   = timeEndSelection.get().strip()
 
                     if not room:
                         err_label.config(text="Please select a room.")
                         return
-                    if not date:
-                        err_label.config(text="Please enter a date.")
+                    if not month or not day or not year:
+                        err_label.config(text="Please enter a complete date.")
                         return
                     if not t_start or not t_end:
                         err_label.config(text="Please enter both start and end times.")
@@ -1824,14 +1907,16 @@ class main(tk.Tk):
                                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                                 cs_ID     VARCHAR(255),
                                 room      VARCHAR(255),
-                                date      VARCHAR(255),
+                                month      VARCHAR(255),
+                                day      VARCHAR(255),
+                                year      VARCHAR(255),
                                 time_start VARCHAR(255),
                                 time_end  VARCHAR(255)
                             )
                         """)
                         cur.execute(
-                            "INSERT INTO cleaning_schedule (cs_ID, room, date, time_start, time_end) VALUES (?, ?, ?, ?, ?)",
-                            (cs_ID.get(), room, date, t_start, t_end)
+                            "INSERT INTO cleaning_schedule (cs_ID, room, month, day, year, time_start, time_end) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (cs_ID.get(), room, month, day, year, t_start, t_end)
                         )
                         con.commit()
                         con.close()
