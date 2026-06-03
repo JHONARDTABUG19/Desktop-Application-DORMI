@@ -189,10 +189,17 @@ class Database:
             cleaning_tree.delete(row)
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            cursor.execute("SELECT cs_ID, full_name, contact, email FROM cleaningStaff")
+            cursor.execute("""
+                SELECT cs.cs_ID, cs.full_name, cs.contact, cs.email, 
+                       COALESCE(sch.building, '—'), COALESCE(sch.room, '—'), 
+                       COALESCE(sch.time_start, '—'), COALESCE(sch.time_end, '—'),
+                       COALESCE(sch.month || '/' || sch.day || '/' || sch.year, '—')
+                FROM cleaningStaff cs
+                LEFT JOIN cleaning_schedule sch ON cs.cs_ID = sch.cs_ID
+            """)
             for row in cursor.fetchall():
                 cleaning_tree.insert("", "end", values=row)
-
+    #for adding cleaning staff to the database, 
     def insert_cleaning_staff(self, cs_ID, last, first, mi, email, contact, full_name):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
@@ -214,8 +221,13 @@ class Database:
     def get_rooms_by_building(self, building):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            cursor.execute("SELECT room_number FROM rooms WHERE building=? AND status='Vacant' ORDER BY room_number",(building,))
-
+            cursor.execute("""
+                SELECT room_number FROM rooms 
+                WHERE building=? 
+                AND occupants <= capacity 
+                AND status != 'Under Maintenance'
+                ORDER BY room_number
+            """, (building,))
             return [row[0] for row in cursor.fetchall()]
 
 
@@ -285,10 +297,12 @@ class Database:
     def collect_room(self):
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
-            cursor.execute("SELECT room_number FROM rooms WHERE status='Vacant'")
+            cursor.execute("""
+                SELECT room_number FROM rooms 
+                WHERE occupants < capacity AND status != 'Under Maintenance'
+            """)
             rooms = cursor.fetchall()
             return [room[0] for room in rooms]
-
     
     def remove_student_from_room(self, student_no):
         with sqlite3.connect(DB_NAME) as connect:
@@ -1314,7 +1328,7 @@ class main(tk.Tk):
 
             roomNumBorder = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
             roomNumBorder.grid(row=1, column=1, sticky="we", pady=(0, 12))
-            vcmd = (win.register(lambda P: P.isdigit() or P == ""), "%P")
+            vcmd = (win.register(lambda P: (P.isdigit() or P == "") and len(P) <= 3), "%P")
             roomNumEntry = tk.Entry(roomNumBorder, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
                         relief="flat", bd=0, insertbackground=FG_DARK,
                         validate="key", validatecommand=vcmd)
@@ -1798,7 +1812,7 @@ class main(tk.Tk):
                 tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK,
                         font=UNIFORM_FONT).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
                 buildingSelection = tk.StringVar()
-                buildingOptions = ["Building A", "Building B", "Building C"]
+                buildingOptions = self.db.get_distinct_buildings()
                 buildingDropdown = ttk.Combobox(midFrame, textvariable=buildingSelection, values=buildingOptions,
                                                 state="readonly", font=UNIFORM_FONT)
                 buildingDropdown.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 12), padx=(0, 6))
@@ -1808,12 +1822,21 @@ class main(tk.Tk):
                 tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK,
                         font=UNIFORM_FONT).grid(row=0, column=3, columnspan=3, sticky="w", pady=(0, 2), padx=(6, 0))
                 roomSelection = tk.StringVar()
-                rooms = self.db.collect_room()
-                roomOptions = rooms if rooms else ["No rooms available"]
-                roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=roomOptions,
+                roomDropdown = ttk.Combobox(midFrame, textvariable=roomSelection, values=[],
                                             state="readonly", font=UNIFORM_FONT)
                 roomDropdown.grid(row=1, column=3, columnspan=3, sticky="we", pady=(0, 12), padx=(6, 0))
-                roomDropdown.current(0)
+
+                def on_cs_building_change(event):
+                    selected_building = buildingSelection.get()
+                    rooms = self.db.get_rooms_by_building(selected_building)
+                    roomDropdown.config(values=rooms if rooms else [])
+                    if rooms:
+                        roomDropdown.current(0)
+                    else:
+                        roomSelection.set("")
+
+                buildingDropdown.bind("<<ComboboxSelected>>", on_cs_building_change)
+
 
 
                 # ── ROW 2 & 3: CALENDAR GROUP (2 Columns Each - Makes them smaller) ──
@@ -1882,6 +1905,7 @@ class main(tk.Tk):
                 err_label.pack(pady=(2, 0))
 
                 def confirm_assign():
+                    building = buildingSelection.get().strip()
                     room  = roomSelection.get().strip()
                     month = Month_Entry.get().strip()
                     day   = Day_Entry.get().strip()
@@ -1889,6 +1913,9 @@ class main(tk.Tk):
                     t_start = timeStartSelection.get().strip()
                     t_end   = timeEndSelection.get().strip()
 
+                    if not building:
+                        err_label.config(text="Please select a building.")
+                        return
                     if not room:
                         err_label.config(text="Please select a room.")
                         return
@@ -1906,21 +1933,23 @@ class main(tk.Tk):
                             CREATE TABLE IF NOT EXISTS cleaning_schedule (
                                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                                 cs_ID     VARCHAR(255),
+                                building  VARCHAR(255),
                                 room      VARCHAR(255),
-                                month      VARCHAR(255),
-                                day      VARCHAR(255),
+                                month     VARCHAR(255),
+                                day       VARCHAR(255),
                                 year      VARCHAR(255),
                                 time_start VARCHAR(255),
                                 time_end  VARCHAR(255)
                             )
                         """)
                         cur.execute(
-                            "INSERT INTO cleaning_schedule (cs_ID, room, month, day, year, time_start, time_end) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                            (cs_ID.get(), room, month, day, year, t_start, t_end)
+                            "INSERT INTO cleaning_schedule (cs_ID, building, room, month, day, year, time_start, time_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (cs_ID.get(), building, room, month, day, year, t_start, t_end)
                         )
                         con.commit()
                         con.close()
                         messagebox.showinfo("Success", "Cleaning schedule assigned successfully.")
+                        self.db.get_all_cleaning_staff(self.cleaning_tree)
                         assign.destroy()
                     except Exception as e:
                         err_label.config(text=f"Error: {e}")
@@ -2030,17 +2059,27 @@ class main(tk.Tk):
             tree_frame.pack(fill="both", expand=True, padx=16)
 
             self.cleaning_tree = ttk.Treeview(tree_frame,
-                                            columns=("CS_ID", "CS_NAME", "CS_CONTACT", "CS_EMAIL"),
+                                            columns=("CS_ID", "CS_NAME", "CS_CONTACT", "CS_EMAIL","Building", "Room", "Start TIme", "End Time","Date"),
                                             show="headings",
                                             style="CleaningStaff.Treeview")
             self.cleaning_tree.heading("CS_ID",      text="Staff ID")
             self.cleaning_tree.heading("CS_NAME",    text="Name")
             self.cleaning_tree.heading("CS_CONTACT", text="Contact")
             self.cleaning_tree.heading("CS_EMAIL",   text="Email")
+            self.cleaning_tree.heading("Building",   text="Building")
+            self.cleaning_tree.heading("Room",       text="Room")
+            self.cleaning_tree.heading("Start TIme", text="Start Time")
+            self.cleaning_tree.heading("End Time",   text="End Time")
+            self.cleaning_tree.heading("Date",       text="Date")
             self.cleaning_tree.column("CS_ID",      width=80)
             self.cleaning_tree.column("CS_NAME",    width=200)
-            self.cleaning_tree.column("CS_CONTACT", width=300)
-            self.cleaning_tree.column("CS_EMAIL",   width=300)
+            self.cleaning_tree.column("CS_CONTACT", width=100)
+            self.cleaning_tree.column("CS_EMAIL",   width=100)
+            self.cleaning_tree.column("Building",   width=100)
+            self.cleaning_tree.column("Room",       width=100)
+            self.cleaning_tree.column("Start TIme", width=100)
+            self.cleaning_tree.column("End Time",   width=100)
+            self.cleaning_tree.column("Date",       width=100)
 
             scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.cleaning_tree.yview)
             self.cleaning_tree.configure(yscrollcommand=scrollbar.set)
