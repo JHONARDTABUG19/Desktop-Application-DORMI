@@ -392,17 +392,17 @@ class main(tk.Tk):
         self.students_page  = tk.Frame(content, bg=content_color)
         self.rooms_page     = tk.Frame(content, bg=content_color)
         self.cleaning_page  = tk.Frame(content, bg=content_color)
-        self.settings_page  = tk.Frame(content, bg=content_color)
+        
 
         self.build_dashboard_page(self.dashboard_page)
         self.build_students_page(self.students_page)
         self.build_rooms_page(self.rooms_page)
         self.build_cleaning_page(self.cleaning_page)
-        self.build_settings_page(self.settings_page)
+        
 
         self.all_pages = [
             self.dashboard_page, self.students_page, self.rooms_page,
-            self.cleaning_page,  self.settings_page
+            self.cleaning_page
         ]
 
         tk.Label(self.sidebar, text="MAIN", bg=sidebar_color, fg=font_color_sidebar,
@@ -435,22 +435,18 @@ class main(tk.Tk):
                                         anchor="w", padx=10, pady=8, cursor="hand2")
         self.cleaningButton.pack(fill="x", padx=10, pady=2)
 
-        self.Settings = tk.Button(self.sidebar, text="  Settings",
-                                  bg=sidebar_color, fg=font_color_sidebar,
-                                  font=("Arial", 10), relief="flat",
-                                  anchor="w", padx=10, pady=8, cursor="hand2")
-        self.Settings.pack(fill="x", padx=10, pady=2)
+
 
         self.all_buttons = [
             self.dashboardButton, self.studentButton, self.roomsButton,
-            self.cleaningButton,  self.Settings
+            self.cleaningButton
         ]
 
         self.dashboardButton.config(command=lambda: self.show_page(self.dashboard_page, self.dashboardButton))
         self.studentButton.config(  command=lambda: self.show_page(self.students_page,  self.studentButton))
         self.roomsButton.config(    command=lambda: self.show_page(self.rooms_page,     self.roomsButton))
         self.cleaningButton.config( command=lambda: self.show_page(self.cleaning_page,  self.cleaningButton))
-        self.Settings.config(       command=lambda: self.show_page(self.settings_page,  self.Settings))
+        
 
         self.show_page(self.dashboard_page, self.dashboardButton)
 
@@ -468,6 +464,13 @@ class main(tk.Tk):
 
         for btn in self.all_buttons:
             bind_hover(btn)
+        
+        #LOGOUT BUTTON
+        tk.Button(self.sidebar, text="⏻  Log Out",
+          bg="#c0392b", fg="white", font=("Arial", 10),
+          relief="flat", anchor="w", padx=10, pady=8,
+          cursor="hand2", command=self.destroy).pack(
+              side="bottom", fill="x", padx=10, pady=(0, 15))
 
     def refresh_dashboard(self):
         ts, tr, tro, tc = self.db.for_dashboard()
@@ -1774,109 +1777,7 @@ class main(tk.Tk):
         reload_master()
 
     # ── Settings page ─────────────────────────────────────────────────
-    def build_settings_page(self, page):
-        topbar = tk.Frame(page, bg=content_color)
-        topbar.pack(fill="x", padx=28, pady=(20, 12))
-        tk.Label(topbar, text="Settings", bg=content_color, fg=FG_DARK,
-                 font=("Segoe UI", 17, "bold")).pack(side="left")
-
-        card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        card.pack(fill="both", expand=True, padx=28, pady=(0, 20))
-
-        tk.Label(card, text="Admin Accounts", bg=WHITE, fg=FG_DARK,
-                 font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(14, 4))
-        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16)
-
-        tree_frame = tk.Frame(card, bg=WHITE)
-        tree_frame.pack(fill="both", expand=True, padx=16, pady=(10, 0))
-
-        style = ttk.Style()
-        style.configure("Settings.Treeview", background=WHITE, foreground=FG_DARK,
-                        rowheight=34, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
-        style.configure("Settings.Treeview.Heading", background=HEADER_BG, foreground="#000000",
-                        font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
-        style.map("Settings.Treeview", background=[("selected", ROW_SEL)], foreground=[("selected", FG_DARK)])
-        style.layout("Settings.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
-
-        self.settings_tree = ttk.Treeview(tree_frame, columns=("username", "password"),
-                                          show="headings", style="Settings.Treeview",
-                                          selectmode="browse", height=6)
-        self.settings_tree.heading("username", text="Username", anchor="w")
-        self.settings_tree.heading("password", text="Password", anchor="w")
-        self.settings_tree.column("username", width=220, anchor="w", stretch=True)
-        self.settings_tree.column("password", width=220, anchor="w", stretch=True)
-
-        sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.settings_tree.yview)
-        self.settings_tree.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
-        self.settings_tree.pack(side="left", fill="both", expand=True)
-
-        fields_frame = tk.Frame(card, bg=WHITE)
-        fields_frame.pack(fill="x", padx=16, pady=(14, 0))
-        fields_frame.columnconfigure(0, weight=1)
-        fields_frame.columnconfigure(1, weight=1)
-
-        for col, lbl in [(0, "Username"), (1, "Password")]:
-            tk.Label(fields_frame, text=lbl, bg=WHITE, fg=FG_DARK,
-                     font=UNIFORM_FONT).grid(row=0, column=col, sticky="w",
-                                             padx=(0, 8) if col == 0 else (0, 0), pady=(0, 2))
-
-        ub = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        ub.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
-        user_entry = tk.Entry(ub, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                              relief="flat", bd=0, insertbackground=FG_DARK)
-        user_entry.pack(fill="x", padx=5, pady=4)
-
-        pb = tk.Frame(fields_frame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-        pb.grid(row=1, column=1, sticky="we", pady=(0, 12))
-        pass_entry = tk.Entry(pb, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                              relief="flat", bd=0, insertbackground=FG_DARK, show="*")
-        pass_entry.pack(fill="x", padx=5, pady=4)
-
-        def on_select(event):
-            selected = self.settings_tree.focus()
-            if selected:
-                v = self.settings_tree.item(selected, "values")
-                user_entry.delete(0, "end"); user_entry.insert(0, v[0])
-                pass_entry.delete(0, "end"); pass_entry.insert(0, v[1])
-
-        self.settings_tree.bind("<ButtonRelease-1>", on_select)
-
-        tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=16)
-        btn_bar = tk.Frame(card, bg=WHITE)
-        btn_bar.pack(fill="x", padx=16, pady=10)
-
-        def add_user():
-            u, p = user_entry.get().strip(), pass_entry.get().strip()
-            if u and p:
-                self.settings_tree.insert("", "end", values=(u, p))
-                user_entry.delete(0, "end"); pass_entry.delete(0, "end")
-
-        def edit_user():
-            sel = self.settings_tree.focus()
-            if not sel: return
-            u, p = user_entry.get().strip(), pass_entry.get().strip()
-            if u and p: self.settings_tree.item(sel, values=(u, p))
-
-        def delete_user():
-            sel = self.settings_tree.focus()
-            if not sel: return
-            self.settings_tree.delete(sel)
-            user_entry.delete(0, "end"); pass_entry.delete(0, "end")
-
-        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
-                       relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
-        tk.Button(btn_bar, text="＋  Add",    command=add_user,    **btn_cfg).pack(side="left", padx=(0, 6))
-        tk.Button(btn_bar, text="✏  Edit",   command=edit_user,   **btn_cfg).pack(side="left", padx=6)
-        tk.Button(btn_bar, text="🗑  Delete", command=delete_user,
-                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                  relief="solid", bd=1, padx=14, pady=5,
-                  cursor="hand2").pack(side="left", padx=6)
-
-        tk.Button(btn_bar, text="⏻  Log Out",
-                  bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
-                  relief="flat", padx=14, pady=5, cursor="hand2",
-                  command=self.destroy).pack(side="right")
+    
 
 
 if __name__ == "__main__":
