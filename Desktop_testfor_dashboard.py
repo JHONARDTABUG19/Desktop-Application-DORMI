@@ -33,39 +33,37 @@ class Database:
     def for_dashboard(self):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT COUNT(*) FROM students")
+            cur.execute("SELECT COUNT(*) FROM Students")
             total_students = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM rooms")
+            cur.execute("SELECT COUNT(*) FROM Rooms")
             total_rooms = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM rooms WHERE occupants > 0")
-            rooms_occupied = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM cleaningStaff")
+            cur.execute("SELECT COUNT(*) FROM CleaningStaff")
             total_cleaning_staff = cur.fetchone()[0]
-            return total_students, total_rooms, rooms_occupied, total_cleaning_staff
+            return total_students, total_rooms, total_cleaning_staff
 
     # ── Students ──────────────────────────────────────────────────────
     def create_student_table(self):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                CREATE TABLE IF NOT EXISTS students (
-                    student_no      VARCHAR(255) PRIMARY KEY,
-                    last_name       VARCHAR(255) NOT NULL,
-                    first_name      VARCHAR(255) NOT NULL,
-                    middle_initial  VARCHAR(255),
-                    program         VARCHAR(255) NOT NULL,
-                    status          VARCHAR(255) NOT NULL,
-                    contact         VARCHAR(255) NOT NULL,
-                    room            VARCHAR(255) DEFAULT '',
-                    building        VARCHAR(255) DEFAULT ''
+                CREATE TABLE IF NOT EXISTS Students (
+                    StudentNo      VARCHAR(255) PRIMARY KEY,
+                    LastName       VARCHAR(255) NOT NULL,
+                    FirstName      VARCHAR(255) NOT NULL,
+                    MiddleInitial  VARCHAR(255),
+                    Program         VARCHAR(255) NOT NULL,
+                    Status          VARCHAR(255) NOT NULL,
+                    Contact         VARCHAR(255) NOT NULL,
+                    Room            VARCHAR(255) DEFAULT '',
+                    Building        VARCHAR(255) DEFAULT ''
                 )
             """)
             con.commit()
 
-    def add_student(self, student_no, last, first, mi, program, status, contact):
+    def add_student(self, StudentNo, last, first, mi, Program, Status, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (student_no, last, first, mi, program, status, contact, "", "")
+                "INSERT INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (StudentNo, last, first, mi, Program, Status, Contact, "", "")
             )
             con.commit()
 
@@ -75,69 +73,69 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT student_no,
-                    TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name),
-                    program, contact, building, room, status
-                FROM students
+                SELECT StudentNo,
+                    TRIM(FirstName || ' ' || COALESCE(MiddleInitial || '. ', '') || LastName),
+                    Program, Contact, Building, Room, Status
+                FROM Students
             """)
             for row in cur.fetchall():
                 tree.insert("", "end", values=row)
 
-    def update_student(self, original_no, student_no, last, first, mi, program, status, contact):
+    def update_student(self, original_no, StudentNo, last, first, mi, Program, Status, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                UPDATE students
-                SET student_no=?, last_name=?, first_name=?, middle_initial=?,
-                    program=?, status=?, contact=?
-                WHERE student_no=?
-            """, (student_no, last, first, mi, program, status, contact, original_no))
+                UPDATE Students
+                SET StudentNo=?, LastName=?, FirstName=?, MiddleInitial=?,
+                    Program=?, Status=?, Contact=?
+                WHERE StudentNo=?
+            """, (StudentNo, last, first, mi, Program, Status, Contact, original_no))
             con.commit()
 
-    def delete_student(self, student_no):
+    def delete_student(self, StudentNo):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("DELETE FROM students WHERE student_no=?", (student_no,))
+            con.execute("DELETE FROM Students WHERE StudentNo=?", (StudentNo,))
             con.commit()
 
     def migrate_students_table(self):
         with sqlite3.connect(DB_NAME) as con:
             try:
-                con.execute("ALTER TABLE students ADD COLUMN room VARCHAR(255) DEFAULT ''")
-                con.execute("ALTER TABLE students ADD COLUMN building VARCHAR(255) DEFAULT ''")
+                con.execute("ALTER TABLE Students ADD COLUMN Room VARCHAR(255) DEFAULT ''")
+                con.execute("ALTER TABLE Students ADD COLUMN Building VARCHAR(255) DEFAULT ''")
                 con.commit()
             except Exception:
                 pass
 
-    def assign_room_to_student(self, student_no, room, building):
+    def assign_room_to_student(self, StudentNo, Room, Building):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("UPDATE students SET room=?, building=? WHERE student_no=?",
-                        (room, building, student_no))
-            cur.execute("UPDATE rooms SET occupants = occupants + 1 WHERE room_number=? AND building=?",
-                        (room, building))
-            cur.execute("""UPDATE rooms SET status='Occupied'
-                           WHERE room_number=? AND building=? AND occupants >= capacity""",
-                        (room, building))
+            cur.execute("UPDATE Students SET Room=?, Building=? WHERE StudentNo=?",
+                        (Room, Building, StudentNo))
+            cur.execute("UPDATE Rooms SET Occupants = Occupants + 1 WHERE RoomNumber=? AND Building=?",
+                        (Room, Building))
+            cur.execute("""UPDATE Rooms SET Status='Occupied'
+                           WHERE RoomNumber=? AND Building=? AND Occupants >= Capacity""",
+                        (Room, Building))
             con.commit()
 
-    def remove_student_from_room(self, student_no):
+    def remove_student_from_room(self, StudentNo):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT room, building FROM students WHERE student_no=?", (student_no,))
+            cur.execute("SELECT Room, Building FROM Students WHERE StudentNo=?", (StudentNo,))
             row = cur.fetchone()
             if row and row[0] and row[1]:
-                room, building = row
-                cur.execute("UPDATE rooms SET occupants = MAX(0, occupants - 1) WHERE room_number=? AND building=?",
-                            (room, building))
-                cur.execute("""UPDATE rooms SET status='Vacant'
-                               WHERE room_number=? AND building=? AND occupants < capacity AND status='Occupied'""",
-                            (room, building))
-                cur.execute("UPDATE students SET room='', building='' WHERE student_no=?", (student_no,))
+                Room, Building = row
+                cur.execute("UPDATE Rooms SET Occupants = MAX(0, Occupants - 1) WHERE RoomNumber=? AND Building=?",
+                            (Room, Building))
+                cur.execute("""UPDATE Rooms SET Status='Vacant'
+                               WHERE RoomNumber=? AND Building=? AND Occupants < Capacity AND Status='Occupied'""",
+                            (Room, Building))
+                cur.execute("UPDATE Students SET Room='', Building='' WHERE StudentNo=?", (StudentNo,))
             con.commit()
 
     def seed_sample_students(self):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT COUNT(*) FROM students")
+            cur.execute("SELECT COUNT(*) FROM Students")
             if cur.fetchone()[0] > 0:
                 return
             sample = [
@@ -153,7 +151,7 @@ class Database:
                 ("2022-00005", "Mendoza",    "Luis",     "T", "BSBA",  "Active",   "09945677890"),
             ]
             cur.executemany(
-                "INSERT OR IGNORE INTO students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [(s[0], s[1], s[2], s[3], s[4], s[5], s[6], "", "") for s in sample]
             )
             con.commit()
@@ -162,24 +160,24 @@ class Database:
     def create_rooms_table(self):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                CREATE TABLE IF NOT EXISTS rooms (
-                    room_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-                    building     VARCHAR(255) NOT NULL,
-                    room_number  VARCHAR(255) NOT NULL,
-                    room_type    VARCHAR(255) NOT NULL,
-                    capacity     INTEGER NOT NULL,
-                    occupants    INTEGER DEFAULT 0,
-                    status       VARCHAR(255) NOT NULL,
-                    last_cleaned VARCHAR(255) DEFAULT '—'
+                CREATE TABLE IF NOT EXISTS Rooms (
+                    RoomID      INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Building     VARCHAR(255) NOT NULL,
+                    RoomNumber  VARCHAR(255) NOT NULL,
+                    Price        REAL DEFAULT 10000,
+                    Capacity     INTEGER NOT NULL,
+                    Occupants    INTEGER DEFAULT 0,
+                    Status       VARCHAR(255) NOT NULL,
+                    LastCleaned VARCHAR(255) DEFAULT '—'
                 )
             """)
             con.commit()
 
-    def add_room(self, building, room_number, room_type, capacity, status):
+    def add_room(self, Building, RoomNumber, Capacity, Status):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO rooms (building, room_number, room_type, capacity, status) VALUES (?, ?, ?, ?, ?)",
-                (building, room_number, room_type, capacity, status)
+                "INSERT INTO Rooms (Building, RoomNumber, Capacity, Status, Price) VALUES (?, ?, ?, ?, ?)",
+                (Building, RoomNumber, Capacity, Status, 10000)
             )
             con.commit()
 
@@ -188,77 +186,77 @@ class Database:
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms")
+            cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms")
             for row in cur.fetchall():
                 tree.insert("", "end", values=row[1:], tags=(row[0],))
 
-    def update_room(self, room_id, building, room_number, room_type, capacity, status):
+    def update_room(self, RoomID, Building, RoomNumber, Capacity, Status):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                UPDATE rooms SET building=?, room_number=?, room_type=?, capacity=?, status=?
-                WHERE room_id=?
-            """, (building, room_number, room_type, capacity, status, room_id))
+                UPDATE Rooms SET Building=?, RoomNumber=?, Capacity=?, Status=?
+                WHERE RoomID=?
+            """, (Building, RoomNumber, Capacity, Status, RoomID))
             con.commit()
 
-    def delete_room(self, room_id):
+    def delete_room(self, RoomID):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("DELETE FROM rooms WHERE room_id=?", (room_id,))
+            con.execute("DELETE FROM Rooms WHERE RoomID=?", (RoomID,))
             con.commit()
 
     def get_distinct_buildings(self):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT DISTINCT building FROM rooms ORDER BY building")
+            cur.execute("SELECT DISTINCT Building FROM Rooms ORDER BY Building")
             return [row[0] for row in cur.fetchall()]
 
-    def get_rooms_by_building(self, building):
+    def get_rooms_by_building(self, Building):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT room_number FROM rooms
-                WHERE building=? AND occupants <= capacity AND status != 'Under Maintenance'
-                ORDER BY room_number
-            """, (building,))
+                SELECT RoomNumber FROM Rooms
+                WHERE Building=? AND Occupants <= Capacity AND Status != 'Under Maintenance'
+                ORDER BY RoomNumber
+            """, (Building,))
             return [row[0] for row in cur.fetchall()]
 
     # ── Cleaning Staff ────────────────────────────────────────────────
     def create_table_cleaning_staff(self):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                CREATE TABLE IF NOT EXISTS cleaningStaff (
-                    cs_ID          VARCHAR(255) PRIMARY KEY,
-                    last_name      VARCHAR(255) NOT NULL,
-                    first_name     VARCHAR(255) NOT NULL,
-                    middle_initial VARCHAR(255),
-                    email          VARCHAR(255) UNIQUE NOT NULL,
-                    contact        VARCHAR(255) NOT NULL,
-                    full_name      VARCHAR(255) NOT NULL
+                CREATE TABLE IF NOT EXISTS CleaningStaff (
+                    StaffID          VARCHAR(255) PRIMARY KEY,
+                    LastName      VARCHAR(255) NOT NULL,
+                    FirstName     VARCHAR(255) NOT NULL,
+                    MiddleInitial VARCHAR(255),
+                    Email          VARCHAR(255) UNIQUE NOT NULL,
+                    Contact        VARCHAR(255) NOT NULL,
+                    FullName      VARCHAR(255) NOT NULL
                 )
             """)
             con.commit()
 
-    def insert_cleaning_staff(self, cs_ID, last, first, mi, email, contact, full_name):
+    def insert_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO cleaningStaff VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (cs_ID, last, first, mi, email, contact, full_name)
+                "INSERT INTO CleaningStaff VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (StaffID, last, first, mi, Email, Contact, FullName)
             )
             con.commit()
 
-    def update_cleaning_staff(self, cs_ID, last, first, mi, email, contact, full_name):
+    def update_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                UPDATE cleaningStaff
-                SET last_name=?, first_name=?, middle_initial=?, email=?, contact=?, full_name=?
-                WHERE cs_ID=?
-            """, (last, first, mi, email, contact, full_name, cs_ID))
+                UPDATE CleaningStaff
+                SET LastName=?, FirstName=?, MiddleInitial=?, Email=?, Contact=?, FullName=?
+                WHERE StaffID=?
+            """, (last, first, mi, Email, Contact, FullName, StaffID))
             con.commit()
 
-    def delete_cleaning_staff(self, cs_ID):
+    def delete_cleaning_staff(self, StaffID):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("DELETE FROM cleaningStaff WHERE cs_ID=?", (cs_ID,))
+            con.execute("DELETE FROM CleaningStaff WHERE StaffID=?", (StaffID,))
             # also remove all their schedules
-            con.execute("DELETE FROM cleaning_schedule WHERE cs_ID=?", (cs_ID,))
+            con.execute("DELETE FROM cleaning_schedule WHERE StaffID=?", (StaffID,))
             con.commit()
 
     def get_all_cleaning_staff(self, tree):
@@ -268,19 +266,19 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                        SELECT cs.cs_ID, cs.full_name, cs.contact, cs.email,
-                            COUNT(sch.id) AS assignments
-                        FROM cleaningStaff cs
+                        SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                            COUNT(sch.Id) AS assignments
+                        FROM CleaningStaff cs
                         LEFT JOIN cleaning_schedule sch 
-                            ON cs.cs_ID = sch.cs_ID
+                            ON cs.StaffID = sch.StaffID
                             AND date(
                                 printf('%04d-%02d-%02d', 
-                                    CAST(sch.year AS INT), 
-                                    CAST(sch.month AS INT), 
-                                    CAST(sch.day AS INT))
+                                    CAST(sch.Year AS INT), 
+                                    CAST(sch.Month AS INT), 
+                                    CAST(sch.Day AS INT))
                             ) >= date('now')
-                        GROUP BY cs.cs_ID
-                        ORDER BY cs.full_name
+                        GROUP BY cs.StaffID
+                        ORDER BY cs.FullName
                     """)
 
             for row in cur.fetchall():
@@ -291,49 +289,49 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
                 CREATE TABLE IF NOT EXISTS cleaning_schedule (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    cs_ID      VARCHAR(255) NOT NULL,
-                    building   VARCHAR(255) NOT NULL,
-                    room       VARCHAR(255) NOT NULL,
-                    month      VARCHAR(255) NOT NULL,
-                    day        VARCHAR(255) NOT NULL,
-                    year       VARCHAR(255) NOT NULL,
-                    time_start VARCHAR(255) NOT NULL,
-                    time_end   VARCHAR(255) NOT NULL
+                    Id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    StaffID      VARCHAR(255) NOT NULL,
+                    Building   VARCHAR(255) NOT NULL,
+                    Room       VARCHAR(255) NOT NULL,
+                    Month      VARCHAR(255) NOT NULL,
+                    Day        VARCHAR(255) NOT NULL,
+                    Year       VARCHAR(255) NOT NULL,
+                    TimeStart VARCHAR(255) NOT NULL,
+                    TimeEnd   VARCHAR(255) NOT NULL
                 )
             """)
             con.commit()
 
-    def get_schedules_for_staff(self, cs_ID, tree):
+    def get_schedules_for_staff(self, StaffID, tree):
         """Detail panel: all schedule rows for one staff member."""
         for row in tree.get_children():
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT id, building, room,
-                       month || '/' || day || '/' || year,
-                       time_start, time_end
+                SELECT Id, Building, Room,
+                       Month || '/' || Day || '/' || Year,
+                       TimeStart, TimeEnd
                 FROM cleaning_schedule
-                WHERE cs_ID=?
-                ORDER BY year, month, day, time_start
-            """, (cs_ID,))
+                WHERE StaffID=?
+                ORDER BY Year, Month, Day, TimeStart
+            """, (StaffID,))
             for i, row in enumerate(cur.fetchall(), start=1):
                 sched_id = row[0]
                 values   = (i,) + row[1:]    # prepend row number; store sched_id as tag
                 tree.insert("", "end", values=values, tags=(sched_id,))
 
-    def add_schedule(self, cs_ID, building, room, month, day, year, time_start, time_end):
+    def add_schedule(self, StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                INSERT INTO cleaning_schedule (cs_ID, building, room, month, day, year, time_start, time_end)
+                INSERT INTO cleaning_schedule (StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (cs_ID, building, room, month, day, year, time_start, time_end))
+            """, (StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd))
             con.commit()
 
     def delete_schedule(self, sched_id):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("DELETE FROM cleaning_schedule WHERE id=?", (sched_id,))
+            con.execute("DELETE FROM cleaning_schedule WHERE Id=?", (sched_id,))
             con.commit()
 
     #============================================================
@@ -343,10 +341,10 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute("""
-                SELECT first_name || ' ' || last_name, building, room, status
-                FROM students
-                WHERE room != '' AND room IS NOT NULL
-                ORDER BY building, room
+                SELECT FirstName || ' ' || LastName, Building, Room, Status
+                FROM Students
+                WHERE Room != '' AND Room IS NOT NULL
+                ORDER BY Building, Room
             """)
             return cursor.fetchall()
 
@@ -356,18 +354,31 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute("""
-                SELECT cs.cs_ID, cs.full_name,
-                    sch.building || ' ' || sch.room,
-                    sch.time_start, sch.time_end
+                SELECT cs.StaffID, cs.FullName,
+                    sch.Building || ' ' || sch.Room,
+                    sch.TimeStart, sch.TimeEnd
                 FROM cleaning_schedule sch
-                JOIN cleaningStaff cs ON cs.cs_ID = sch.cs_ID
-                WHERE CAST(sch.month AS INT) = ?
-                AND CAST(sch.day   AS INT) = ?
-                AND CAST(sch.year  AS INT) = ?
-                ORDER BY sch.time_start
+                JOIN CleaningStaff cs ON cs.StaffID = sch.StaffID
+                WHERE CAST(sch.Month AS INT) = ?
+                AND CAST(sch.Day   AS INT) = ?
+                AND CAST(sch.Year  AS INT) = ?
+                ORDER BY sch.TimeStart
             """, (today.month, today.day, today.year))
             return cursor.fetchall()
+    
+    def get_total_revenue_this_month(self):
+        from datetime import datetime
+        today = datetime.now()
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            cur.execute("SELECT COALESCE(SUM(Price), 0) FROM Rooms WHERE Occupants > 0")
+            return cur.fetchone()[0]
 
+    def get_total_available_slots(self):
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            cur.execute("SELECT COALESCE(SUM(Capacity - Occupants), 0) FROM Rooms")
+            return cur.fetchone()[0]
     
 
 
@@ -388,12 +399,13 @@ class main(tk.Tk):
         self.db.create_cleaning_schedule_table()
         self.db.migrate_students_table()
         
+        
         self.db.seed_sample_students()
 
         self.all_pages   = []
         self.all_buttons = []
 
-        # Will hold the cs_ID of whichever staff row is selected
+        # Will hold the StaffID of whichever staff row is selected
         self._selected_cs_id = None
 
         self.main_build_layout()
@@ -498,19 +510,18 @@ class main(tk.Tk):
               side="bottom", fill="x", padx=10, pady=(0, 15))
 
     def refresh_dashboard(self):
-        ts, tr, tro, tc = self.db.for_dashboard()
+        ts, tr, tc = self.db.for_dashboard()
         self.tsNum.config(text=str(ts))
         self.trNum.config(text=str(tr))
-        self.troNum.config(text=str(tro))
         self.tcNum.config(text=str(tc))
+        self.trevNum.config(text=f"₱{self.db.get_total_revenue_this_month():,.0f}")
+        self.tavNum.config(text=str(self.db.get_total_available_slots()))
 
-        # Recent student assignments # NEWLY ADDED ____________________________________________________________________________________--
         for row in self.treeStuAss.get_children():
             self.treeStuAss.delete(row)
         for row in self.db.get_assigned_students():
             self.treeStuAss.insert("", "end", values=row)
 
-        # Today's cleaning assignments
         for row in self.treeCleanAss.get_children():
             self.treeCleanAss.delete(row)
         for row in self.db.get_todays_cleaning_assignments():
@@ -546,10 +557,11 @@ class main(tk.Tk):
             tk.Label(inner, text=label_text, font=("Arial", 13), bg="white", fg=accent).pack(anchor="w", padx=10, pady=(2, 0))
             return num_lbl
 
-        self.tsNum  = make_card(cards_frame, "#8A5F41", "🧑",  "tsNum",  "Total students")
-        self.trNum  = make_card(cards_frame, "#4A8C7A", "🛏️", "trNum",  "Total rooms")
-        self.troNum = make_card(cards_frame, "#C48B2A", "🛌", "troNum", "Rooms occupied")
+        self.tsNum  = make_card(cards_frame, "#8A5F41", "🧑",  "tsNum",  "Total Students")
+        self.trNum  = make_card(cards_frame, "#4A8C7A", "🛏️", "trNum",  "Total Rooms")
         self.tcNum  = make_card(cards_frame, "#A05C6A", "🧹",  "tcNum",  "Cleaning staff")
+        self.trevNum = make_card(cards_frame, "#A5AB2E", "💰", "trevNum", "Revenue this month")
+        self.tavNum  = make_card(cards_frame, "#27ae60", "🏠", "tavNum",  "Can accommodate")
 
         tk.Label(page, text="Recent student assignments", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
@@ -656,20 +668,20 @@ class main(tk.Tk):
                 last    = e_last.get().strip()
                 first   = e_first.get().strip()
                 mi      = e_mi.get().strip()
-                program = e_program.get().strip()
-                status  = statusVar.get()
-                contact = e_contact.get().strip()
+                Program = e_program.get().strip()
+                Status  = statusVar.get()
+                Contact = e_contact.get().strip()
 
                 limits = [(no, 20, "Student No."), (last, 50, "Last Name"),
                           (first, 50, "First Name"), (mi, 2, "Middle Initial"),
-                          (program, 10, "Program"), (contact, 15, "Contact")]
+                          (Program, 10, "Program"), (Contact, 15, "Contact")]
                 for value, limit, lbl in limits:
                     if len(value) > limit:
                         err_label.config(text=f"{lbl} exceeds {limit} character limit.")
                         return
 
                 for value, lbl in [(last, "Last Name"), (first, "First Name"),
-                                   (mi, "Middle Initial"), (program, "Program")]:
+                                   (mi, "Middle Initial"), (Program, "Program")]:
                     if value and not re.match(r"^[A-Za-z\s]+$", value):
                         err_label.config(text=f"{lbl} must contain letters only.")
                         return
@@ -678,19 +690,19 @@ class main(tk.Tk):
                     err_label.config(text="Student No., Last Name and First Name are required.")
                     return
 
-                full_name = f"{first} {f'{mi}. ' if mi else ''}{last}".strip()
+                FullName = f"{first} {f'{mi}. ' if mi else ''}{last}".strip()
 
                 if edit_item:
                     original_no = self.tree.item(edit_item, "values")[0]
                     old_values  = self.tree.item(edit_item, "values")
-                    self.db.update_student(original_no, no, last, first, mi, program, status, contact)
+                    self.db.update_student(original_no, no, last, first, mi, Program, Status, Contact)
                     self.tree.item(edit_item, values=(
-                        no, full_name, program, contact,
-                        old_values[4], old_values[5], status
+                        no, FullName, Program, Contact,
+                        old_values[4], old_values[5], Status
                     ))
                 else:
-                    self.db.add_student(no, last, first, mi, program, status, contact)
-                    self.tree.insert("", "end", values=(no, full_name, program, contact, "", "", status))
+                    self.db.add_student(no, last, first, mi, Program, Status, Contact)
+                    self.tree.insert("", "end", values=(no, FullName, Program, Contact, "", "", Status))
 
                 update_count()
                 self.refresh_dashboard()
@@ -711,9 +723,9 @@ class main(tk.Tk):
                 messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
                 return
             if messagebox_confirm("Delete this student? This cannot be undone."):
-                student_no = self.tree.item(selected[0], "values")[0]
-                self.db.remove_student_from_room(student_no)
-                self.db.delete_student(student_no)
+                StudentNo = self.tree.item(selected[0], "values")[0]
+                self.db.remove_student_from_room(StudentNo)
+                self.db.delete_student(StudentNo)
                 self.tree.delete(selected[0])
                 self.db.get_all_rooms(self.rooms_tree)
                 update_count()
@@ -769,9 +781,9 @@ class main(tk.Tk):
             roomDrop.grid(row=4, column=0, sticky="we", pady=(0, 12))
 
             def on_building_change(event):
-                rooms = self.db.get_rooms_by_building(buildingVar.get())
-                roomDrop.config(values=rooms)
-                if rooms:
+                Rooms = self.db.get_rooms_by_building(buildingVar.get())
+                roomDrop.config(values=Rooms)
+                if Rooms:
                     roomDrop.current(0)
                 else:
                     roomVar.set("")
@@ -866,15 +878,15 @@ class main(tk.Tk):
 
         def do_search():
             q = search_entry.get().strip().lower()
-            if q == "search by id or name...": q = ""
+            if q == "search by Id or name...": q = ""
             for r in self.tree.get_children(): self.tree.delete(r)
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT student_no,
-                        TRIM(first_name || ' ' || COALESCE(middle_initial || '. ', '') || last_name),
-                        program, contact, building, room, status
-                    FROM students WHERE LOWER(student_no) LIKE ? OR LOWER(first_name || ' ' || last_name) LIKE ?
+                    SELECT StudentNo,
+                        TRIM(FirstName || ' ' || COALESCE(MiddleInitial || '. ', '') || LastName),
+                        Program, Contact, Building, Room, Status
+                    FROM Students WHERE LOWER(StudentNo) LIKE ? OR LOWER(FirstName || ' ' || LastName) LIKE ?
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall(): self.tree.insert("", "end", values=r)
             update_count()
@@ -907,13 +919,13 @@ class main(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=16)
 
         self.tree = ttk.Treeview(tree_frame,
-                                 columns=("student_no", "name", "program", "contact", "building", "room", "status"),
+                                 columns=("StudentNo", "name", "Program", "Contact", "Building", "Room", "Status"),
                                  show="headings", style="Students.Treeview", selectmode="browse")
         for cid, heading, width, anchor in [
-            ("student_no", "Student no.", 120, "w"), ("name", "Name", 190, "w"),
-            ("program", "Program", 85, "center"), ("contact", "Contact", 120, "w"),
-            ("building", "Building", 90, "center"), ("room", "Room", 70, "center"),
-            ("status", "Status", 95, "center")
+            ("StudentNo", "Student no.", 120, "w"), ("name", "Name", 190, "w"),
+            ("Program", "Program", 85, "center"), ("Contact", "Contact", 120, "w"),
+            ("Building", "Building", 90, "center"), ("Room", "Room", 70, "center"),
+            ("Status", "Status", 95, "center")
         ]:
             self.tree.heading(cid, text=heading, anchor=anchor)
             self.tree.column(cid, width=width, anchor=anchor, stretch=True)
@@ -927,7 +939,7 @@ class main(tk.Tk):
         action_bar = tk.Frame(card, bg=WHITE)
         action_bar.pack(fill="x", padx=16, pady=10)
 
-        self.count_label = tk.Label(action_bar, text="0 students", bg=WHITE, fg=FG_MUTED, font=UNIFORM_FONT)
+        self.count_label = tk.Label(action_bar, text="0 Students", bg=WHITE, fg=FG_MUTED, font=UNIFORM_FONT)
         self.count_label.pack(side="left", padx=(4, 0))
 
         def update_count():
@@ -937,7 +949,7 @@ class main(tk.Tk):
         btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
                        relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
         tk.Button(action_bar, text="✏  Edit",        command=edit_student,  **btn_cfg).pack(side="right", padx=4)
-        tk.Button(action_bar, text="⊞  Assign room", command=assign_room,   **btn_cfg).pack(side="right", padx=4)
+        tk.Button(action_bar, text="⊞  Assign Room", command=assign_room,   **btn_cfg).pack(side="right", padx=4)
         tk.Button(action_bar, text="🗑  Delete",
                   bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
                   relief="solid", bd=1, padx=14, pady=5, cursor="hand2",
@@ -974,7 +986,7 @@ class main(tk.Tk):
         topbar.pack(fill="x", padx=28, pady=(20, 12))
         tk.Label(topbar, text="Rooms", bg=content_color, fg=FG_DARK,
                  font=("Segoe UI", 17, "bold")).pack(side="left")
-        add_btn = tk.Button(topbar, text="+ Add room", bg=WHITE, fg=FG_DARK,
+        add_btn = tk.Button(topbar, text="+ Add Room", bg=WHITE, fg=FG_DARK,
                             font=UNIFORM_FONT, relief="solid", bd=1, padx=12, pady=5, cursor="hand2")
         add_btn.pack(side="right")
 
@@ -1003,13 +1015,13 @@ class main(tk.Tk):
 
         def do_rsearch():
             q = rsearch.get().strip().lower()
-            if q == "search by room no. or building...": q = ""
+            if q == "search by Room no. or Building...": q = ""
             for r in self.rooms_tree.get_children(): self.rooms_tree.delete(r)
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned
-                    FROM rooms WHERE LOWER(room_number) LIKE ? OR LOWER(building) LIKE ?
+                    SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price
+                    FROM Rooms WHERE LOWER(RoomNumber) LIKE ? OR LOWER(Building) LIKE ?
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall():
                     self.rooms_tree.insert("", "end", values=r[1:], tags=(r[0],))
@@ -1038,9 +1050,9 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 if status_filter == "All":
-                    cur.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms")
+                    cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms")
                 else:
-                    cur.execute("SELECT room_id, room_number, building, room_type, capacity, occupants, status, last_cleaned FROM rooms WHERE status=?",
+                    cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms WHERE Status=?",
                                 (status_filter,))
                 for r in cur.fetchall():
                     self.rooms_tree.insert("", "end", values=r[1:], tags=(r[0],))
@@ -1063,12 +1075,12 @@ class main(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=16)
 
         self.rooms_tree = ttk.Treeview(tree_frame,
-                                       columns=("room_no", "Building", "type", "capacity", "occupants", "status"),
+                                       columns=("room_no", "Building", "Capacity", "Occupants", "Status", "Price"),
                                        show="headings", style="Rooms.Treeview", selectmode="browse")
         for cid, heading, width, anchor in [
             ("room_no", "Room No.", 90, "center"), ("Building", "Building", 70, "center"),
-            ("type", "Type", 100, "center"), ("capacity", "Capacity", 80, "center"),
-            ("occupants", "Occupants", 90, "center"), ("status", "Status", 120, "center")
+            ("Capacity", "Capacity", 80, "center"),
+            ("Occupants", "Occupants", 90, "center"), ("Status", "Status", 120, "center"), ("Price", "Price", 100, "center")
         ]:
             self.rooms_tree.heading(cid, text=heading, anchor=anchor)
             self.rooms_tree.column(cid, width=width, anchor=anchor, stretch=True)
@@ -1082,12 +1094,12 @@ class main(tk.Tk):
         action_bar = tk.Frame(card, bg=WHITE)
         action_bar.pack(fill="x", padx=16, pady=10)
 
-        room_count_lbl = tk.Label(action_bar, text="0 rooms total", bg=WHITE, fg=FG_MUTED, font=UNIFORM_FONT)
+        room_count_lbl = tk.Label(action_bar, text="0 Rooms total", bg=WHITE, fg=FG_MUTED, font=UNIFORM_FONT)
         room_count_lbl.pack(side="left", padx=(4, 0))
 
         def update_room_count():
             n = len(self.rooms_tree.get_children())
-            room_count_lbl.config(text=f"{n} room{'s' if n != 1 else ''} total")
+            room_count_lbl.config(text=f"{n} Room{'s' if n != 1 else ''} total")
 
         def add_room_window(prefill=None, edit_item=None):
             win = tk.Toplevel()
@@ -1098,64 +1110,74 @@ class main(tk.Tk):
             win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
-            upperFrame.pack(fill="x", padx=15, pady=12)
+            upperFrame.pack(fill="x", padx=15, pady=9)
             tk.Label(upperFrame, text="Edit Room" if edit_item else "Add Room",
                      bg=content_color, fg=FG_DARK, font=("Segoe UI", 15, "bold")).pack(side="left")
 
             midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=10,
                                 bd=1, relief="solid", highlightbackground=BORDER)
-            midFrame.pack(fill="both", expand=True, padx=15, pady=(5, 0))
+            midFrame.pack(fill="both", expand=True, padx=15)
+            
             midFrame.columnconfigure(0, weight=1)
             midFrame.columnconfigure(1, weight=1)
 
-            tk.Label(midFrame, text="Building",    bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            tk.Label(midFrame, text="Room Number", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
-            tk.Label(midFrame, text="Room Type",   bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            tk.Label(midFrame, text="Capacity",    bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0, 2))
-            tk.Label(midFrame, text="Status",      bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 2))
+            # Row 0 — labels
+            tk.Label(midFrame, text="Building",     bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="Room Number",  bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", padx=(6,0), pady=(0,2))
 
+            # Row 1 — Building drop | Room number entry
             buildingVar = tk.StringVar()
             buildingDrop = ttk.Combobox(midFrame, textvariable=buildingVar,
                                         values=["BLD-A", "BLD-B", "BLD-C"],
                                         state="readonly", font=UNIFORM_FONT)
-            buildingDrop.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+            buildingDrop.grid(row=1, column=0, sticky="we", padx=(0,6), pady=(0,12))
             buildingDrop.current(0)
 
             nb = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            nb.grid(row=1, column=1, sticky="we", pady=(0, 12))
+            nb.grid(row=1, column=1, sticky="we", padx=(6,0), pady=(0,12))
             vcmd = (win.register(lambda P: (P.isdigit() or P == "") and len(P) <= 3), "%P")
             roomNumEntry = tk.Entry(nb, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
                                     relief="flat", bd=0, insertbackground=FG_DARK,
                                     validate="key", validatecommand=vcmd)
             roomNumEntry.pack(fill="x", padx=5, pady=3)
 
-            typeVar = tk.StringVar()
-            typeDrop = ttk.Combobox(midFrame, textvariable=typeVar,
-                                    values=["Single", "Double", "Triple", "Suite"],
-                                    state="readonly", font=UNIFORM_FONT)
-            typeDrop.grid(row=3, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
-            typeDrop.current(0)
+            # Row 2 — labels
+            tk.Label(midFrame, text="Capacity", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="Status",   bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", padx=(6,0), pady=(0,2))
 
+            # Row 3 — Capacity drop | Status drop
             capacityVar = tk.StringVar()
             capDrop = ttk.Combobox(midFrame, textvariable=capacityVar,
-                                   values=["1", "2", "3", "4", "5", "6", "7", "8"],
-                                   state="readonly", font=UNIFORM_FONT)
-            capDrop.grid(row=3, column=1, sticky="we", pady=(0, 12))
+                                values=["1","2","3","4","5","6","7","8"],
+                                state="readonly", font=UNIFORM_FONT)
+            capDrop.grid(row=3, column=0, sticky="we", padx=(0,6), pady=(0,12))
             capDrop.current(0)
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
-                                      values=["Vacant", "Occupied", "Under Maintenance"],
-                                      state="readonly", font=UNIFORM_FONT)
-            statusDrop.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 4))
+                                    values=["Vacant", "Occupied", "Under Maintenance"],
+                                    state="readonly", font=UNIFORM_FONT)
+            statusDrop.grid(row=3, column=1, sticky="we", padx=(6,0), pady=(0,12))
             statusDrop.current(0)
+
+            # Row 4 — Price label (right column only)
+            tk.Label(midFrame, text="Price", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", padx=(6,0), pady=(0,2))
+
+            # Row 5 — Price entry (right column only, readonly)
+            priceF = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            priceF.grid(row=5, column=1, sticky="we", padx=(6,0), pady=(0,12))
+            priceEntry = tk.Entry(priceF, bg="#f0f0f0", fg=BLACK, font=UNIFORM_FONT,
+                                relief="flat", bd=0)
+            priceEntry.pack(fill="x", padx=5, pady=3)
+            priceEntry.insert(0, "10000")
+            priceEntry.config(state="readonly")
+
 
             if prefill:
                 buildingVar.set(prefill[1])
                 roomNumEntry.insert(0, prefill[0])
-                typeVar.set(prefill[2])
-                capacityVar.set(str(prefill[3]))
-                statusVar.set(prefill[5])
+                capacityVar.set(str(prefill[2]))
+                statusVar.set(prefill[4])
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_label.pack()
@@ -1165,11 +1187,11 @@ class main(tk.Tk):
                 if not room_no:
                     err_label.config(text="Room number is required."); return
                 if edit_item:
-                    room_id = self.rooms_tree.item(edit_item, "tags")[0]
-                    self.db.update_room(room_id, buildingVar.get(), room_no, typeVar.get(),
+                    RoomID = self.rooms_tree.item(edit_item, "tags")[0]
+                    self.db.update_room(RoomID, buildingVar.get(), room_no,
                                         int(capacityVar.get()), statusVar.get())
                 else:
-                    self.db.add_room(buildingVar.get(), room_no, typeVar.get(),
+                    self.db.add_room(buildingVar.get(), room_no,
                                      int(capacityVar.get()), statusVar.get())
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
@@ -1188,8 +1210,8 @@ class main(tk.Tk):
         def delete_room():
             selected = self.rooms_tree.selection()
             if not selected:
-                messagebox.showwarning("Selection Required", "Please click a room from the table first."); return
-            if rooms_confirm("Delete this room? This cannot be undone."):
+                messagebox.showwarning("Selection Required", "Please click a Room from the table first."); return
+            if rooms_confirm("Delete this Room? This cannot be undone."):
                 self.db.delete_room(self.rooms_tree.item(selected[0], "tags")[0])
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
@@ -1198,13 +1220,13 @@ class main(tk.Tk):
         def edit_room():
             selected = self.rooms_tree.selection()
             if not selected:
-                messagebox.showwarning("Selection Required", "Please click a room from the table first."); return
+                messagebox.showwarning("Selection Required", "Please click a Room from the table first."); return
             add_room_window(prefill=self.rooms_tree.item(selected[0], "values"), edit_item=selected[0])
 
         def view_room_details():
             selected = self.rooms_tree.selection()
             if not selected:
-                messagebox.showwarning("Selection Required", "Please click a room from the table first."); return
+                messagebox.showwarning("Selection Required", "Please click a Room from the table first."); return
             values = self.rooms_tree.item(selected[0], "values")
             win = tk.Toplevel()
             win.title(f"Room {values[0]} — Details")
@@ -1222,9 +1244,9 @@ class main(tk.Tk):
             midFrame.columnconfigure(0, weight=1)
             midFrame.columnconfigure(1, weight=2)
             for i, (lbl, val) in enumerate([
-                ("Room Number", values[0]), ("Building", values[1]), ("Room Type", values[2]),
-                ("Capacity", values[3]), ("Occupants", values[4]),
-                ("Status", values[5]), ("Last Cleaned", values[6])
+                ("Room Number", values[0]), ("Building", values[1]),
+                ("Capacity", values[2]), ("Occupants", values[3]),
+                ("Status", values[4]), ("Last Cleaned", values[5])
             ]):
                 tk.Label(midFrame, text=lbl, bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 9)).grid(row=i, column=0, sticky="w", pady=5)
                 tk.Label(midFrame, text=val, bg=WHITE, fg=FG_DARK, font=("Segoe UI", 10, "bold")).grid(row=i, column=1, sticky="w", pady=5, padx=(10, 0))
@@ -1257,7 +1279,7 @@ class main(tk.Tk):
         """
         Top half  : master list of cleaning staff (ID, Name, Contact, Email, # assignments)
         Bottom half: schedule detail panel for the selected staff member
-                     – one row per room assignment
+                     – one row per Room assignment
                      – each row has its own ✕ remove button
                      – "Assign Cleaning" button in the detail header adds a new row
         """
@@ -1491,18 +1513,18 @@ class main(tk.Tk):
             roomDrop.grid(row=1, column=3, columnspan=3, sticky="we", pady=(0, 12), padx=(6, 0))
 
             def on_bld_change(event):
-                rooms = self.db.get_rooms_by_building(buildingVar.get())
-                roomDrop.config(values=rooms)
-                if rooms: roomDrop.current(0)
+                Rooms = self.db.get_rooms_by_building(buildingVar.get())
+                roomDrop.config(values=Rooms)
+                if Rooms: roomDrop.current(0)
                 else: roomVar.set("")
 
             bldDrop.bind("<<ComboboxSelected>>", on_bld_change)
 
             # Month (cols 0-1) / Day (cols 2-3) / Year (cols 4-5)
             for col_s, colspan, label, var_name in [
-                (0, 2, "Month", "month"),
-                (2, 2, "Day",   "day"),
-                (4, 2, "Year",  "year"),
+                (0, 2, "Month", "Month"),
+                (2, 2, "Day",   "Day"),
+                (4, 2, "Year",  "Year"),
             ]:
                 grp = tk.Frame(midFrame, bg=WHITE)
                 grp.grid(row=2, column=col_s, columnspan=colspan, sticky="we",
@@ -1516,8 +1538,8 @@ class main(tk.Tk):
                                relief="flat", bd=0, insertbackground=FG_DARK)
                 ent.pack(fill="x", padx=5, pady=4)
                 # store as attribute so we can read them
-                if var_name == "month": month_entry = ent
-                elif var_name == "day": day_entry   = ent
+                if var_name == "Month": month_entry = ent
+                elif var_name == "Day": day_entry   = ent
                 else:                  year_entry  = ent
 
             # Time start (cols 0-2) / Time end (cols 3-5)
@@ -1547,23 +1569,23 @@ class main(tk.Tk):
             err_lbl.pack(pady=(2, 0))
 
             def confirm_assign():
-                building = buildingVar.get().strip()
-                room     = roomVar.get().strip()
-                month    = month_entry.get().strip()
-                day      = day_entry.get().strip()
-                year     = year_entry.get().strip()
+                Building = buildingVar.get().strip()
+                Room     = roomVar.get().strip()
+                Month    = month_entry.get().strip()
+                Day      = day_entry.get().strip()
+                Year     = year_entry.get().strip()
                 t_start  = tsVar.get().strip()
                 t_end    = teVar.get().strip()
 
-                if not building or not room:
-                    err_lbl.config(text="Please select a building and room."); return
-                if not month or not day or not year:
+                if not Building or not Room:
+                    err_lbl.config(text="Please select a Building and Room."); return
+                if not Month or not Day or not Year:
                     err_lbl.config(text="Please enter a complete date."); return
                 if not t_start or not t_end:
                     err_lbl.config(text="Please select start and end times."); return
 
                 try:
-                    self.db.add_schedule(cs, building, room, month, day, year, t_start, t_end)
+                    self.db.add_schedule(cs, Building, Room, Month, Day, Year, t_start, t_end)
                     reload_detail()
                     reload_master()      # refresh assignment count
                     messagebox.showinfo("Success", "Cleaning assignment added.")
@@ -1660,17 +1682,17 @@ class main(tk.Tk):
 
         def do_cs_search():
             q = cs_search.get().strip().lower()
-            if q == "search by id or name...": q = ""
+            if q == "search by Id or name...": q = ""
             for r in self.cleaning_tree.get_children(): self.cleaning_tree.delete(r)
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT cs.cs_ID, cs.full_name, cs.contact, cs.email,
-                           COUNT(sch.id)
-                    FROM cleaningStaff cs
-                    LEFT JOIN cleaning_schedule sch ON cs.cs_ID = sch.cs_ID
-                    WHERE LOWER(cs.cs_ID) LIKE ? OR LOWER(cs.full_name) LIKE ?
-                    GROUP BY cs.cs_ID
+                    SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                           COUNT(sch.Id)
+                    FROM CleaningStaff cs
+                    LEFT JOIN cleaning_schedule sch ON cs.StaffID = sch.StaffID
+                    WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FullName) LIKE ?
+                    GROUP BY cs.StaffID
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall():
                     self.cleaning_tree.insert("", "end", values=r)
@@ -1707,7 +1729,7 @@ class main(tk.Tk):
 
         self.cleaning_tree = ttk.Treeview(
             master_tf,
-            columns=("cs_id", "name", "contact", "email", "assignments"),
+            columns=("cs_id", "name", "Contact", "Email", "assignments"),
             show="headings",
             style="CS.Master.Treeview",
             selectmode="browse",
@@ -1716,8 +1738,8 @@ class main(tk.Tk):
         for cid, heading, width, anchor in [
             ("cs_id",       "Staff ID",    90,  "w"),
             ("name",        "Name",       200,  "w"),
-            ("contact",     "Contact",    120,  "w"),
-            ("email",       "Email",      180,  "w"),
+            ("Contact",     "Contact",    120,  "w"),
+            ("Email",       "Email",      180,  "w"),
             ("assignments", "Assignments", 90,  "center"),
         ]:
             self.cleaning_tree.heading(cid, text=heading, anchor=anchor)
@@ -1773,7 +1795,7 @@ class main(tk.Tk):
 
         self.schedule_tree = ttk.Treeview(
             detail_tf,
-            columns=("#", "building", "room", "date", "time_start", "time_end"),
+            columns=("#", "Building", "Room", "date", "TimeStart", "TimeEnd"),
             show="headings",
             style="CS.Detail.Treeview",
             selectmode="browse",
@@ -1781,11 +1803,11 @@ class main(tk.Tk):
         )
         for cid, heading, width, anchor in [
             ("#",          "#",          40,  "center"),
-            ("building",   "Building",   90,  "center"),
-            ("room",       "Room",       80,  "center"),
+            ("Building",   "Building",   90,  "center"),
+            ("Room",       "Room",       80,  "center"),
             ("date",       "Date",      110,  "center"),
-            ("time_start", "Time Start", 110, "center"),
-            ("time_end",   "Time End",   110, "center"),
+            ("TimeStart", "Time Start", 110, "center"),
+            ("TimeEnd",   "Time End",   110, "center"),
         ]:
             self.schedule_tree.heading(cid, text=heading, anchor=anchor)
             self.schedule_tree.column(cid, width=width, anchor=anchor, stretch=True)
