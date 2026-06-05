@@ -37,11 +37,9 @@ class Database:
             total_students = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM Rooms")
             total_rooms = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM Rooms WHERE Occupants > 0")
-            rooms_occupied = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM CleaningStaff")
             total_cleaning_staff = cur.fetchone()[0]
-            return total_students, total_rooms, rooms_occupied, total_cleaning_staff
+            return total_students, total_rooms, total_cleaning_staff
 
     # ── Students ──────────────────────────────────────────────────────
     def create_student_table(self):
@@ -166,7 +164,7 @@ class Database:
                     RoomID      INTEGER PRIMARY KEY AUTOINCREMENT,
                     Building     VARCHAR(255) NOT NULL,
                     RoomNumber  VARCHAR(255) NOT NULL,
-                    RoomType    VARCHAR(255) NOT NULL,
+                    Price        REAL DEFAULT 10000,
                     Capacity     INTEGER NOT NULL,
                     Occupants    INTEGER DEFAULT 0,
                     Status       VARCHAR(255) NOT NULL,
@@ -175,11 +173,11 @@ class Database:
             """)
             con.commit()
 
-    def add_room(self, Building, RoomNumber, RoomType, Capacity, Status):
+    def add_room(self, Building, RoomNumber, Capacity, Status):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO Rooms (Building, RoomNumber, RoomType, Capacity, Status) VALUES (?, ?, ?, ?, ?)",
-                (Building, RoomNumber, RoomType, Capacity, Status)
+                "INSERT INTO Rooms (Building, RoomNumber, Capacity, Status, Price) VALUES (?, ?, ?, ?, ?)",
+                (Building, RoomNumber, Capacity, Status, 10000)
             )
             con.commit()
 
@@ -188,16 +186,16 @@ class Database:
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT RoomID, RoomNumber, Building, RoomType, Capacity, Occupants, Status, LastCleaned FROM Rooms")
+            cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms")
             for row in cur.fetchall():
                 tree.insert("", "end", values=row[1:], tags=(row[0],))
 
-    def update_room(self, RoomID, Building, RoomNumber, RoomType, Capacity, Status):
+    def update_room(self, RoomID, Building, RoomNumber, Capacity, Status):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                UPDATE Rooms SET Building=?, RoomNumber=?, RoomType=?, Capacity=?, Status=?
+                UPDATE Rooms SET Building=?, RoomNumber=?, Capacity=?, Status=?
                 WHERE RoomID=?
-            """, (Building, RoomNumber, RoomType, Capacity, Status, RoomID))
+            """, (Building, RoomNumber, Capacity, Status, RoomID))
             con.commit()
 
     def delete_room(self, RoomID):
@@ -365,9 +363,22 @@ class Database:
                 AND CAST(sch.Day   AS INT) = ?
                 AND CAST(sch.Year  AS INT) = ?
                 ORDER BY sch.TimeStart
-            """, (today.Month, today.Day, today.Year))
+            """, (today.month, today.day, today.year))
             return cursor.fetchall()
+    
+    def get_total_revenue_this_month(self):
+        from datetime import datetime
+        today = datetime.now()
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            cur.execute("SELECT COALESCE(SUM(Price), 0) FROM Rooms WHERE Occupants > 0")
+            return cur.fetchone()[0]
 
+    def get_total_available_slots(self):
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            cur.execute("SELECT COALESCE(SUM(Capacity - Occupants), 0) FROM Rooms")
+            return cur.fetchone()[0]
     
 
 
@@ -387,6 +398,7 @@ class main(tk.Tk):
         self.db.create_table_cleaning_staff()
         self.db.create_cleaning_schedule_table()
         self.db.migrate_students_table()
+        
         
         self.db.seed_sample_students()
 
@@ -498,19 +510,18 @@ class main(tk.Tk):
               side="bottom", fill="x", padx=10, pady=(0, 15))
 
     def refresh_dashboard(self):
-        ts, tr, tro, tc = self.db.for_dashboard()
+        ts, tr, tc = self.db.for_dashboard()
         self.tsNum.config(text=str(ts))
         self.trNum.config(text=str(tr))
-        self.troNum.config(text=str(tro))
         self.tcNum.config(text=str(tc))
+        self.trevNum.config(text=f"₱{self.db.get_total_revenue_this_month():,.0f}")
+        self.tavNum.config(text=str(self.db.get_total_available_slots()))
 
-        # Recent student assignments # NEWLY ADDED ____________________________________________________________________________________--
         for row in self.treeStuAss.get_children():
             self.treeStuAss.delete(row)
         for row in self.db.get_assigned_students():
             self.treeStuAss.insert("", "end", values=row)
 
-        # Today's cleaning assignments
         for row in self.treeCleanAss.get_children():
             self.treeCleanAss.delete(row)
         for row in self.db.get_todays_cleaning_assignments():
@@ -548,8 +559,9 @@ class main(tk.Tk):
 
         self.tsNum  = make_card(cards_frame, "#8A5F41", "🧑",  "tsNum",  "Total Students")
         self.trNum  = make_card(cards_frame, "#4A8C7A", "🛏️", "trNum",  "Total Rooms")
-        self.troNum = make_card(cards_frame, "#C48B2A", "🛌", "troNum", "Rooms occupied")
         self.tcNum  = make_card(cards_frame, "#A05C6A", "🧹",  "tcNum",  "Cleaning staff")
+        self.trevNum = make_card(cards_frame, "#A5AB2E", "💰", "trevNum", "Revenue this month")
+        self.tavNum  = make_card(cards_frame, "#27ae60", "🏠", "tavNum",  "Can accommodate")
 
         tk.Label(page, text="Recent student assignments", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
@@ -615,7 +627,7 @@ class main(tk.Tk):
                                                  padx=((0, 6) if col == 0 else (6, 6) if col == 1 else (6, 0)),
                                                  pady=(0, 2))
             e_last  = make_entry(midFrame, 3, 0, padx=(0, 6))
-            e_first = make_entry(midFrame, 3, 1, padx=(6, 6))
+            e_first = make_entry(midFrame, 3, 1, padx=(6, 6))   
             e_mi    = make_entry(midFrame, 3, 2, padx=(6, 0), width=3)
 
             tk.Label(midFrame, text="Program", bg=WHITE, fg=FG_DARK,
@@ -1008,7 +1020,7 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT RoomID, RoomNumber, Building, RoomType, Capacity, Occupants, Status, LastCleaned
+                    SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price
                     FROM Rooms WHERE LOWER(RoomNumber) LIKE ? OR LOWER(Building) LIKE ?
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall():
@@ -1038,9 +1050,9 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 if status_filter == "All":
-                    cur.execute("SELECT RoomID, RoomNumber, Building, RoomType, Capacity, Occupants, Status, LastCleaned FROM Rooms")
+                    cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms")
                 else:
-                    cur.execute("SELECT RoomID, RoomNumber, Building, RoomType, Capacity, Occupants, Status, LastCleaned FROM Rooms WHERE Status=?",
+                    cur.execute("SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price FROM Rooms WHERE Status=?",
                                 (status_filter,))
                 for r in cur.fetchall():
                     self.rooms_tree.insert("", "end", values=r[1:], tags=(r[0],))
@@ -1063,12 +1075,12 @@ class main(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=16)
 
         self.rooms_tree = ttk.Treeview(tree_frame,
-                                       columns=("room_no", "Building", "type", "Capacity", "Occupants", "Status"),
+                                       columns=("room_no", "Building", "Capacity", "Occupants", "Status", "Price"),
                                        show="headings", style="Rooms.Treeview", selectmode="browse")
         for cid, heading, width, anchor in [
             ("room_no", "Room No.", 90, "center"), ("Building", "Building", 70, "center"),
-            ("type", "Type", 100, "center"), ("Capacity", "Capacity", 80, "center"),
-            ("Occupants", "Occupants", 90, "center"), ("Status", "Status", 120, "center")
+            ("Capacity", "Capacity", 80, "center"),
+            ("Occupants", "Occupants", 90, "center"), ("Status", "Status", 120, "center"), ("Price", "Price", 100, "center")
         ]:
             self.rooms_tree.heading(cid, text=heading, anchor=anchor)
             self.rooms_tree.column(cid, width=width, anchor=anchor, stretch=True)
@@ -1098,64 +1110,74 @@ class main(tk.Tk):
             win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
-            upperFrame.pack(fill="x", padx=15, pady=12)
+            upperFrame.pack(fill="x", padx=15, pady=9)
             tk.Label(upperFrame, text="Edit Room" if edit_item else "Add Room",
                      bg=content_color, fg=FG_DARK, font=("Segoe UI", 15, "bold")).pack(side="left")
 
             midFrame = tk.Frame(win, bg=WHITE, padx=15, pady=10,
                                 bd=1, relief="solid", highlightbackground=BORDER)
-            midFrame.pack(fill="both", expand=True, padx=15, pady=(5, 0))
+            midFrame.pack(fill="both", expand=True, padx=15)
+            
             midFrame.columnconfigure(0, weight=1)
             midFrame.columnconfigure(1, weight=1)
 
-            tk.Label(midFrame, text="Building",    bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            tk.Label(midFrame, text="Room Number", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", pady=(0, 2))
-            tk.Label(midFrame, text="Room Type",   bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
-            tk.Label(midFrame, text="Capacity",    bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", pady=(0, 2))
-            tk.Label(midFrame, text="Status",      bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 2))
+            # Row 0 — labels
+            tk.Label(midFrame, text="Building",     bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="Room Number",  bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=0, column=1, sticky="w", padx=(6,0), pady=(0,2))
 
+            # Row 1 — Building drop | Room number entry
             buildingVar = tk.StringVar()
             buildingDrop = ttk.Combobox(midFrame, textvariable=buildingVar,
                                         values=["BLD-A", "BLD-B", "BLD-C"],
                                         state="readonly", font=UNIFORM_FONT)
-            buildingDrop.grid(row=1, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
+            buildingDrop.grid(row=1, column=0, sticky="we", padx=(0,6), pady=(0,12))
             buildingDrop.current(0)
 
             nb = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-            nb.grid(row=1, column=1, sticky="we", pady=(0, 12))
+            nb.grid(row=1, column=1, sticky="we", padx=(6,0), pady=(0,12))
             vcmd = (win.register(lambda P: (P.isdigit() or P == "") and len(P) <= 3), "%P")
             roomNumEntry = tk.Entry(nb, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
                                     relief="flat", bd=0, insertbackground=FG_DARK,
                                     validate="key", validatecommand=vcmd)
             roomNumEntry.pack(fill="x", padx=5, pady=3)
 
-            typeVar = tk.StringVar()
-            typeDrop = ttk.Combobox(midFrame, textvariable=typeVar,
-                                    values=["Single", "Double", "Triple", "Suite"],
-                                    state="readonly", font=UNIFORM_FONT)
-            typeDrop.grid(row=3, column=0, sticky="we", padx=(0, 8), pady=(0, 12))
-            typeDrop.current(0)
+            # Row 2 — labels
+            tk.Label(midFrame, text="Capacity", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=0, sticky="w", padx=(0,6), pady=(0,2))
+            tk.Label(midFrame, text="Status",   bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=2, column=1, sticky="w", padx=(6,0), pady=(0,2))
 
+            # Row 3 — Capacity drop | Status drop
             capacityVar = tk.StringVar()
             capDrop = ttk.Combobox(midFrame, textvariable=capacityVar,
-                                   values=["1", "2", "3", "4", "5", "6", "7", "8"],
-                                   state="readonly", font=UNIFORM_FONT)
-            capDrop.grid(row=3, column=1, sticky="we", pady=(0, 12))
+                                values=["1","2","3","4","5","6","7","8"],
+                                state="readonly", font=UNIFORM_FONT)
+            capDrop.grid(row=3, column=0, sticky="we", padx=(0,6), pady=(0,12))
             capDrop.current(0)
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
-                                      values=["Vacant", "Occupied", "Under Maintenance"],
-                                      state="readonly", font=UNIFORM_FONT)
-            statusDrop.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 4))
+                                    values=["Vacant", "Occupied", "Under Maintenance"],
+                                    state="readonly", font=UNIFORM_FONT)
+            statusDrop.grid(row=3, column=1, sticky="we", padx=(6,0), pady=(0,12))
             statusDrop.current(0)
+
+            # Row 4 — Price label (right column only)
+            tk.Label(midFrame, text="Price", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=4, column=1, sticky="w", padx=(6,0), pady=(0,2))
+
+            # Row 5 — Price entry (right column only, readonly)
+            priceF = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
+            priceF.grid(row=5, column=1, sticky="we", padx=(6,0), pady=(0,12))
+            priceEntry = tk.Entry(priceF, bg="#f0f0f0", fg=BLACK, font=UNIFORM_FONT,
+                                relief="flat", bd=0)
+            priceEntry.pack(fill="x", padx=5, pady=3)
+            priceEntry.insert(0, "10000")
+            priceEntry.config(state="readonly")
+
 
             if prefill:
                 buildingVar.set(prefill[1])
                 roomNumEntry.insert(0, prefill[0])
-                typeVar.set(prefill[2])
-                capacityVar.set(str(prefill[3]))
-                statusVar.set(prefill[5])
+                capacityVar.set(str(prefill[2]))
+                statusVar.set(prefill[4])
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_label.pack()
@@ -1166,10 +1188,10 @@ class main(tk.Tk):
                     err_label.config(text="Room number is required."); return
                 if edit_item:
                     RoomID = self.rooms_tree.item(edit_item, "tags")[0]
-                    self.db.update_room(RoomID, buildingVar.get(), room_no, typeVar.get(),
+                    self.db.update_room(RoomID, buildingVar.get(), room_no,
                                         int(capacityVar.get()), statusVar.get())
                 else:
-                    self.db.add_room(buildingVar.get(), room_no, typeVar.get(),
+                    self.db.add_room(buildingVar.get(), room_no,
                                      int(capacityVar.get()), statusVar.get())
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
@@ -1222,9 +1244,9 @@ class main(tk.Tk):
             midFrame.columnconfigure(0, weight=1)
             midFrame.columnconfigure(1, weight=2)
             for i, (lbl, val) in enumerate([
-                ("Room Number", values[0]), ("Building", values[1]), ("Room Type", values[2]),
-                ("Capacity", values[3]), ("Occupants", values[4]),
-                ("Status", values[5]), ("Last Cleaned", values[6])
+                ("Room Number", values[0]), ("Building", values[1]),
+                ("Capacity", values[2]), ("Occupants", values[3]),
+                ("Status", values[4]), ("Last Cleaned", values[5])
             ]):
                 tk.Label(midFrame, text=lbl, bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 9)).grid(row=i, column=0, sticky="w", pady=5)
                 tk.Label(midFrame, text=val, bg=WHITE, fg=FG_DARK, font=("Segoe UI", 10, "bold")).grid(row=i, column=1, sticky="w", pady=5, padx=(10, 0))
@@ -1521,30 +1543,64 @@ class main(tk.Tk):
                 else:                  year_entry  = ent
 
             # Time start (cols 0-2) / Time end (cols 3-5)
+# ── TIME OPTIONS GENERATION ───────────────────────────────────
             timeOptions = [
-                "07:00 AM","07:30 AM","08:00 AM","08:30 AM","09:00 AM","09:30 AM",
-                "10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM",
-                "01:00 PM","01:30 PM","02:00 PM","02:30 PM","03:00 PM","03:30 PM",
-                "04:00 PM","04:30 PM","05:00 PM","05:30 PM","06:00 PM","06:30 PM",
-                "07:00 PM","07:30 PM","08:00 PM","08:30 PM","09:00 PM",
+                "07:00 AM", "07:30 AM", "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
+                "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+                "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
+                "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM",
+                "07:00 PM", "07:30 PM", "08:00 PM", "08:30 PM", "09:00 PM"
             ]
 
-            tsF = tk.Frame(midFrame, bg=WHITE)
-            tsF.grid(row=4, column=0, columnspan=3, sticky="we", padx=(0, 6))
-            tk.Label(tsF, text="Time Start", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            tsVar = tk.StringVar()
-            tsDrop = ttk.Combobox(tsF, textvariable=tsVar, values=timeOptions, state="readonly", font=UNIFORM_FONT)
-            tsDrop.pack(fill="x", ipady=1); tsDrop.current(2)
+            # ── TIME START DROPDOWN (Column 0) ────────────────────────────
+            timeStartFrame = tk.Frame(midFrame, bg=WHITE)
+            timeStartFrame.grid(row=4, column=0, columnspan=3, sticky="we", padx=(0, 6))
+                
+            tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                
+            timeStartSelection = tk.StringVar()
+            timeStartDropdown = ttk.Combobox(timeStartFrame, textvariable=timeStartSelection, 
+                                                 values=timeOptions, state="readonly", font=UNIFORM_FONT)
+            timeStartDropdown.pack(fill="x", ipady=1)
 
-            teF = tk.Frame(midFrame, bg=WHITE)
-            teF.grid(row=4, column=3, columnspan=3, sticky="we", padx=(6, 0))
-            tk.Label(teF, text="Time End", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            teVar = tk.StringVar()
-            teDrop = ttk.Combobox(teF, textvariable=teVar, values=timeOptions, state="readonly", font=UNIFORM_FONT)
-            teDrop.pack(fill="x", ipady=1); teDrop.current(4)
+            # ── TIME END DROPDOWN (Column 3) ──────────────────────────────
+            timeEndFrame = tk.Frame(midFrame, bg=WHITE)
+            timeEndFrame.grid(row=4, column=3, columnspan=3, sticky="we", padx=(6, 0))
+                
+            tk.Label(timeEndFrame, text="Time Should End", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                
+            timeEndSelection = tk.StringVar()
+            timeEndDropdown = ttk.Combobox(timeEndFrame, textvariable=timeEndSelection, 
+                                               values=[], state="disabled", font=UNIFORM_FONT) # Initialized as disabled and empty
+            timeEndDropdown.pack(fill="x", ipady=1)
 
             err_lbl = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_lbl.pack(pady=(2, 0))
+
+
+                # ── FILTER AND ENABLE LOGIC ───────────────────────────────────
+            def update_end_times(event=None):
+                selected_start = timeStartDropdown.get()
+                if not selected_start:
+                    return
+                    
+                # Find the index position of the chosen start time in our list
+                start_index = timeOptions.index(selected_start)
+                    
+                # Slice the list to grab only the elements AFTER the start_index
+                allowed_end_times = timeOptions[start_index + 1:]
+                    
+                if allowed_end_times:
+                    # Enable the dropdown, load the valid times, and set the first valid option
+                    timeEndDropdown.config(state="readonly", values=allowed_end_times)
+                    timeEndDropdown.current(0)
+                else:
+                    # Edge case: if they picked 09:00 PM, there are no valid end times left
+                    timeEndDropdown.config(state="disabled", values=["No valid times"])
+                    timeEndSelection.set("No valid times")
+
+            # Bind the function to trigger immediately when a start time is chosen
+            timeStartDropdown.bind("<<ComboboxSelected>>", update_end_times)
 
             def confirm_assign():
                 Building = buildingVar.get().strip()
@@ -1552,8 +1608,8 @@ class main(tk.Tk):
                 Month    = month_entry.get().strip()
                 Day      = day_entry.get().strip()
                 Year     = year_entry.get().strip()
-                t_start  = tsVar.get().strip()
-                t_end    = teVar.get().strip()
+                t_start  = timeStartSelection.get().strip()
+                t_end    = timeEndSelection.get().strip()
 
                 if not Building or not Room:
                     err_lbl.config(text="Please select a Building and Room."); return
@@ -1760,7 +1816,7 @@ class main(tk.Tk):
                                     bg=WHITE, fg=FG_DARK, font=("Segoe UI", 11, "bold"))
         detail_title_lbl.pack(side="left")
 
-        tk.Button(detail_hdr, text="+ Assign cleaning",
+        tk.Button(detail_hdr, text="+ Assign Cleaning",
                   command=open_assign_window,
                   bg=sidebar_color, fg=WHITE, font=UNIFORM_FONT,
                   relief="flat", padx=12, pady=4, cursor="hand2").pack(side="right")
