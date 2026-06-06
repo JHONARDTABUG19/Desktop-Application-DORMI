@@ -627,7 +627,7 @@ class main(tk.Tk):
                                                  padx=((0, 6) if col == 0 else (6, 6) if col == 1 else (6, 0)),
                                                  pady=(0, 2))
             e_last  = make_entry(midFrame, 3, 0, padx=(0, 6))
-            e_first = make_entry(midFrame, 3, 1, padx=(6, 6))
+            e_first = make_entry(midFrame, 3, 1, padx=(6, 6))   
             e_mi    = make_entry(midFrame, 3, 2, padx=(6, 0), width=3)
 
             tk.Label(midFrame, text="Program", bg=WHITE, fg=FG_DARK,
@@ -1543,30 +1543,64 @@ class main(tk.Tk):
                 else:                  year_entry  = ent
 
             # Time start (cols 0-2) / Time end (cols 3-5)
+# ── TIME OPTIONS GENERATION ───────────────────────────────────
             timeOptions = [
-                "07:00 AM","07:30 AM","08:00 AM","08:30 AM","09:00 AM","09:30 AM",
-                "10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM",
-                "01:00 PM","01:30 PM","02:00 PM","02:30 PM","03:00 PM","03:30 PM",
-                "04:00 PM","04:30 PM","05:00 PM","05:30 PM","06:00 PM","06:30 PM",
-                "07:00 PM","07:30 PM","08:00 PM","08:30 PM","09:00 PM",
+                "07:00 AM", "07:30 AM", "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
+                "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+                "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
+                "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", "06:00 PM", "06:30 PM",
+                "07:00 PM", "07:30 PM", "08:00 PM", "08:30 PM", "09:00 PM"
             ]
 
-            tsF = tk.Frame(midFrame, bg=WHITE)
-            tsF.grid(row=4, column=0, columnspan=3, sticky="we", padx=(0, 6))
-            tk.Label(tsF, text="Time Start", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            tsVar = tk.StringVar()
-            tsDrop = ttk.Combobox(tsF, textvariable=tsVar, values=timeOptions, state="readonly", font=UNIFORM_FONT)
-            tsDrop.pack(fill="x", ipady=1); tsDrop.current(2)
+            # ── TIME START DROPDOWN (Column 0) ────────────────────────────
+            timeStartFrame = tk.Frame(midFrame, bg=WHITE)
+            timeStartFrame.grid(row=4, column=0, columnspan=3, sticky="we", padx=(0, 6))
+                
+            tk.Label(timeStartFrame, text="Time Start", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                
+            timeStartSelection = tk.StringVar()
+            timeStartDropdown = ttk.Combobox(timeStartFrame, textvariable=timeStartSelection, 
+                                                 values=timeOptions, state="readonly", font=UNIFORM_FONT)
+            timeStartDropdown.pack(fill="x", ipady=1)
 
-            teF = tk.Frame(midFrame, bg=WHITE)
-            teF.grid(row=4, column=3, columnspan=3, sticky="we", padx=(6, 0))
-            tk.Label(teF, text="Time End", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-            teVar = tk.StringVar()
-            teDrop = ttk.Combobox(teF, textvariable=teVar, values=timeOptions, state="readonly", font=UNIFORM_FONT)
-            teDrop.pack(fill="x", ipady=1); teDrop.current(4)
+            # ── TIME END DROPDOWN (Column 3) ──────────────────────────────
+            timeEndFrame = tk.Frame(midFrame, bg=WHITE)
+            timeEndFrame.grid(row=4, column=3, columnspan=3, sticky="we", padx=(6, 0))
+                
+            tk.Label(timeEndFrame, text="Time Should End", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                
+            timeEndSelection = tk.StringVar()
+            timeEndDropdown = ttk.Combobox(timeEndFrame, textvariable=timeEndSelection, 
+                                               values=[], state="disabled", font=UNIFORM_FONT) # Initialized as disabled and empty
+            timeEndDropdown.pack(fill="x", ipady=1)
 
             err_lbl = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_lbl.pack(pady=(2, 0))
+
+
+                # ── FILTER AND ENABLE LOGIC ───────────────────────────────────
+            def update_end_times(event=None):
+                selected_start = timeStartDropdown.get()
+                if not selected_start:
+                    return
+                    
+                # Find the index position of the chosen start time in our list
+                start_index = timeOptions.index(selected_start)
+                    
+                # Slice the list to grab only the elements AFTER the start_index
+                allowed_end_times = timeOptions[start_index + 1:]
+                    
+                if allowed_end_times:
+                    # Enable the dropdown, load the valid times, and set the first valid option
+                    timeEndDropdown.config(state="readonly", values=allowed_end_times)
+                    timeEndDropdown.current(0)
+                else:
+                    # Edge case: if they picked 09:00 PM, there are no valid end times left
+                    timeEndDropdown.config(state="disabled", values=["No valid times"])
+                    timeEndSelection.set("No valid times")
+
+            # Bind the function to trigger immediately when a start time is chosen
+            timeStartDropdown.bind("<<ComboboxSelected>>", update_end_times)
 
             def confirm_assign():
                 Building = buildingVar.get().strip()
@@ -1574,8 +1608,8 @@ class main(tk.Tk):
                 Month    = month_entry.get().strip()
                 Day      = day_entry.get().strip()
                 Year     = year_entry.get().strip()
-                t_start  = tsVar.get().strip()
-                t_end    = teVar.get().strip()
+                t_start  = timeStartSelection.get().strip()
+                t_end    = timeEndSelection.get().strip()
 
                 if not Building or not Room:
                     err_lbl.config(text="Please select a Building and Room."); return
@@ -1782,7 +1816,7 @@ class main(tk.Tk):
                                     bg=WHITE, fg=FG_DARK, font=("Segoe UI", 11, "bold"))
         detail_title_lbl.pack(side="left")
 
-        tk.Button(detail_hdr, text="+ Assign cleaning",
+        tk.Button(detail_hdr, text="+ Assign Cleaning",
                   command=open_assign_window,
                   bg=sidebar_color, fg=WHITE, font=UNIFORM_FONT,
                   relief="flat", padx=12, pady=4, cursor="hand2").pack(side="right")
