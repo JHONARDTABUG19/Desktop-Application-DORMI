@@ -1640,6 +1640,9 @@ class main(tk.Tk):
                     err_lbl.config(text="Please enter a complete date."); return
                 if not t_start or not t_end:
                     err_lbl.config(text="Please select start and end times."); return
+                if int(Year) < 2026:
+                    err_lbl.config(text="Year must be 2026 or later."); return
+
 
                 try:
                     self.db.add_schedule(cs, Building, Room, Month, Day, Year, t_start, t_end)
@@ -1894,8 +1897,6 @@ class main(tk.Tk):
 
     # ── Settings page ─────────────────────────────────────────────────
     
-
-
 if __name__ == "__main__":
     app = main()
     app.mainloop()  
