@@ -3,6 +3,9 @@ import tkinter.ttk as ttk
 from tkinter import messagebox
 import sqlite3
 import re
+import shutil
+import os
+from datetime import datetime
 
 UNIFORM_FONT = ("Segoe UI", 10)
 
@@ -23,7 +26,30 @@ black = "#070707"
 
 DB_NAME = "dorm_management.db"
 
+def auto_backup():
+    """
+    Copies dorm_management.db to a backups/ folder with a timestamp.
+    Keeps only the 10 most recent backups — deletes the oldest ones.
+    Called once on app startup.
+    """
+    if not os.path.exists(DB_NAME):
+        return  # nothing to back up yet
 
+    backup_dir = "backups"
+    os.makedirs(backup_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    backup_path = os.path.join(backup_dir, f"dorm_backup_{timestamp}.db")
+
+    shutil.copy2(DB_NAME, backup_path)
+
+    # ── Keep only the 10 most recent backups ──────────────────────────
+    all_backups = sorted(
+        [f for f in os.listdir(backup_dir) if f.startswith("dorm_backup_")],
+        reverse=True
+    )
+    for old_file in all_backups[10:]:
+        os.remove(os.path.join(backup_dir, old_file))
 # ══════════════════════════════════════════════════════════════════════
 #  DATABASE LAYER
 # ══════════════════════════════════════════════════════════════════════
@@ -393,6 +419,7 @@ class main(tk.Tk):
         self.title("Dormi Admin Panel")
 
         self.db = Database()
+        auto_backup()   
         self.db.create_student_table()
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
