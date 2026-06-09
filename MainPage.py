@@ -595,20 +595,51 @@ class main(tk.Tk):
         tk.Label(page, text="Recent student assignments", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
 
-        self.treeStuAss = ttk.Treeview(page, columns=("Student", "Building", "Room", "Status"), show="headings")
-        for col, w in [("Student", 150), ("Building", 50), ("Room", 50), ("Status", 75)]:
-            self.treeStuAss.heading(col, text=col)
-            self.treeStuAss.column(col, width=w)
-        self.treeStuAss.pack(fill="both", padx=20, pady=10)
+    
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Dashboard.Treeview",
+                        background=WHITE,
+                        foreground=FG_DARK,
+                        rowheight=36,
+                        fieldbackground=WHITE,
+                        borderwidth=0,
+                        font=UNIFORM_FONT)
+        style.configure("Dashboard.Treeview.Heading",
+                        background=HEADER_BG,
+                        foreground="#000000",
+                        font=("Segoe UI", 9, "bold"),
+                        relief="flat",
+                        padding=(8, 6))
+        style.map("Dashboard.Treeview",
+                background=[("selected", ROW_SEL)],
+                foreground=[("selected", FG_DARK)])
+        style.layout("Dashboard.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+        
+        stu_frame = tk.Frame(page, bg=WHITE, highlightbackground="#d0c4b0", highlightthickness=1)
+        stu_frame.pack(fill="both", padx=20, pady=10)
+        self.treeStuAss = ttk.Treeview(stu_frame, columns=("Student", "Building", "Room", "Status"),
+                                        show="headings", style="Dashboard.Treeview", height=5)
+        for col, w, anchor in [("Student", 150, "w"), ("Building", 80, "center"),
+                                ("Room", 80, "center"), ("Status", 90, "center")]:
+            self.treeStuAss.heading(col, text=col, anchor=anchor)
+            self.treeStuAss.column(col, width=w, anchor=anchor, stretch=True)
+        self.treeStuAss.pack(fill="both", expand=True)
 
         tk.Label(page, text="Cleaning assignments today", bg=content_color,
                  font=("Arial", 12, "bold"), fg="black").pack(anchor="w", pady=5, padx=30)
 
-        self.treeCleanAss = ttk.Treeview(page, columns=("ID", "StaffName", "Room", "TimeStart", "TimeEnd"), show="headings")
-        for col, w in [("ID", 50), ("StaffName", 150), ("Room", 50), ("TimeStart", 75), ("TimeEnd", 75)]:
-            self.treeCleanAss.heading(col, text=col)
-            self.treeCleanAss.column(col, width=w)
-        self.treeCleanAss.pack(fill="both", padx=20, pady=10)
+        clean_frame = tk.Frame(page, bg=WHITE, highlightbackground="#d0c4b0", highlightthickness=1)
+        clean_frame.pack(fill="both", padx=20, pady=10)
+        self.treeCleanAss = ttk.Treeview(clean_frame, columns=("ID", "StaffName", "Room", "TimeStart", "TimeEnd"),
+                                        show="headings", style="Dashboard.Treeview", height=5)
+        for col, w, anchor in [("ID", 80, "w"), ("StaffName", 180, "w"), ("Room", 100, "center"),
+                                ("TimeStart", 100, "center"), ("TimeEnd", 100, "center")]:
+            self.treeCleanAss.heading(col, text=col, anchor=anchor)
+            self.treeCleanAss.column(col, width=w, anchor=anchor, stretch=True)
+        self.treeCleanAss.pack(fill="both", expand=True)
+
 
     # ── Students page ─────────────────────────────────────────────────
     def build_students_page(self, page):
