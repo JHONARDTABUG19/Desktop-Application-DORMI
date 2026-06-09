@@ -50,6 +50,8 @@ def auto_backup():
     )
     for old_file in all_backups[10:]:
         os.remove(os.path.join(backup_dir, old_file))
+
+
 # ══════════════════════════════════════════════════════════════════════
 #  DATABASE LAYER
 # ══════════════════════════════════════════════════════════════════════
@@ -419,7 +421,7 @@ class main(tk.Tk):
         self.title("Dormi Admin Panel")
 
         self.db = Database()
-        auto_backup()   
+        auto_backup()
         self.db.create_student_table()
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
@@ -1320,6 +1322,20 @@ class main(tk.Tk):
 
         def validate_str(P):
             return P == "" or P.isalpha() or " " in P
+        
+        def validate_range(P, max_limit):
+            # 1. Allow the user to completely clear the box (blank string)
+            if P == "":
+                return True
+                
+            # 2. Check if the typed characters are actually digits
+            if P.isdigit():
+                # Convert the text to an integer and check the limit
+                if int(P) <= int(max_limit):
+                    return True
+                    
+            # Reject anything else (letters, symbols, or numbers too high)
+            return False
 
         # ── helpers ───────────────────────────────────────────────────
         def reload_master():
@@ -1519,7 +1535,7 @@ class main(tk.Tk):
             for col in range(6):
                 midFrame.columnconfigure(col, weight=1, uniform="g")
 
-            vcmd_int = midFrame.register(validate_int)
+            vcmd_range = win.register(validate_range)
 
             # Building (cols 0-2) / Room (cols 3-5)
             tk.Label(midFrame, text="Building", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(
@@ -1529,8 +1545,8 @@ class main(tk.Tk):
                                    values=self.db.get_distinct_buildings(),
                                    state="readonly", font=UNIFORM_FONT)
             bldDrop.grid(row=1, column=0, columnspan=3, sticky="we", pady=(0, 12), padx=(0, 6))
-            if self.db.get_distinct_buildings():
-                bldDrop.current(0)
+            # if self.db.get_distinct_buildings():
+            #     bldDrop.current(0)
 
             tk.Label(midFrame, text="Room", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(
                 row=0, column=3, columnspan=3, sticky="w", pady=(0, 2), padx=(6, 0))
@@ -1548,26 +1564,35 @@ class main(tk.Tk):
             bldDrop.bind("<<ComboboxSelected>>", on_bld_change)
 
             # Month (cols 0-1) / Day (cols 2-3) / Year (cols 4-5)
-            for col_s, colspan, label, var_name in [
-                (0, 2, "Month", "Month"),
-                (2, 2, "Day",   "Day"),
-                (4, 2, "Year",  "Year"),
+            # Added the limit (12, 31, 9999) as the last item in each tuple
+            for col_s, colspan, label, var_name, limit in [
+                (0, 2, "Month", "Month", 12),
+                (2, 2, "Day",   "Day",   31),
+                (4, 2, "Year",  "Year",  9999),
             ]:
                 grp = tk.Frame(midFrame, bg=WHITE)
                 grp.grid(row=2, column=col_s, columnspan=colspan, sticky="we",
                          padx=(0, 4) if col_s == 0 else (4, 4) if col_s == 2 else (4, 0),
                          pady=(0, 12))
+                
                 tk.Label(grp, text=label, bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
+                
                 bdr = tk.Frame(grp, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
                 bdr.pack(fill="x")
+                
                 ent = tk.Entry(bdr, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                               validate="key", validatecommand=(vcmd_int, "%P"),
+                               validate="key", 
+                               validatecommand=(vcmd_range, "%P", limit),
                                relief="flat", bd=0, insertbackground=FG_DARK)
                 ent.pack(fill="x", padx=5, pady=4)
+                
                 # store as attribute so we can read them
-                if var_name == "Month": month_entry = ent
-                elif var_name == "Day": day_entry   = ent
-                else:                  year_entry  = ent
+                if var_name == "Month": 
+                    month_entry = ent
+                elif var_name == "Day": 
+                    day_entry = ent
+                else: 
+                    year_entry = ent
 
             # Time start (cols 0-2) / Time end (cols 3-5)
 # ── TIME OPTIONS GENERATION ───────────────────────────────────
@@ -1644,6 +1669,9 @@ class main(tk.Tk):
                     err_lbl.config(text="Please enter a complete date."); return
                 if not t_start or not t_end:
                     err_lbl.config(text="Please select start and end times."); return
+                if int(Year) < 2026:
+                    err_lbl.config(text="Year must be 2026 or later."); return
+
 
                 try:
                     self.db.add_schedule(cs, Building, Room, Month, Day, Year, t_start, t_end)
@@ -1898,8 +1926,6 @@ class main(tk.Tk):
 
     # ── Settings page ─────────────────────────────────────────────────
     
-
-
 if __name__ == "__main__":
     app = main()
     app.mainloop()  
