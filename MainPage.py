@@ -171,7 +171,7 @@ class Database:
                 ("2021-00002", "Santos",     "Juan",     "D", "BSIT",  "Active",   "09189876543"),
                 ("2021-00003", "Dela Cruz",  "Anna",     "L", "BSN",   "Active",   "09201112222"),
                 ("2021-00004", "Garcia",     "Carlo",    "M", "BSEE",  "Inactive", "09333334444"),
-                ("2021-00005", "Torres",     "Patricia", "R", "BSME",  "On Leave", "09455556666"),
+                ("2021-00005", "Torres",     "Patricia", "R", "BSME",  "Inactive", "09455556666"),
                 ("2022-00001", "Villanueva", "Miguel",   "A", "BSCS",  "Active",   "09567778888"),
                 ("2022-00002", "Castillo",   "Sophia",   "B", "BSIT",  "Active",   "09689990000"),
                 ("2022-00003", "Morales",    "Andres",   "C", "BSCE",  "Active",   "09701231234"),
@@ -698,7 +698,7 @@ class main(tk.Tk):
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
-                                      values=["Active", "Inactive", "On Leave"],
+                                      values=["Active", "Inactive"],
                                       state="readonly", font=UNIFORM_FONT)
             statusDrop.grid(row=5, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 10))
             statusDrop.current(0)
@@ -755,12 +755,23 @@ class main(tk.Tk):
                 if edit_item:
                     original_no = self.tree.item(edit_item, "values")[0]
                     old_values  = self.tree.item(edit_item, "values")
+                    old_status  = old_values[6]
+
                     self.db.update_student(original_no, no, last, first, mi, Program, Status, Contact)
+
+                    if old_status == "Active" and Status == "Inactive" and old_values[4] and old_values[5]:
+                        self.db.remove_student_from_room(original_no)
+                        self.db.get_all_rooms(self.rooms_tree)
+                        new_building, new_room = "", ""
+                    else:
+                        new_building, new_room = old_values[4], old_values[5]
+
                     self.tree.item(edit_item, values=(
                         no, FullName, Program, Contact,
-                        old_values[4], old_values[5], Status
+                        new_building, new_room, Status
                     ))
-                else:
+
+                else:  
                     self.db.add_student(no, last, first, mi, Program, Status, Contact)
                     self.tree.insert("", "end", values=(no, FullName, Program, Contact, "", "", Status))
 
@@ -854,7 +865,7 @@ class main(tk.Tk):
                      font=UNIFORM_FONT).grid(row=5, column=0, sticky="w", pady=(0, 4))
             statusVar2 = tk.StringVar()
             statusDrop2 = ttk.Combobox(midFrame, textvariable=statusVar2,
-                                       values=["Active", "Inactive", "On Leave"],
+                                       values=["Active", "Inactive"],
                                        state="readonly", font=UNIFORM_FONT)
             statusDrop2.grid(row=6, column=0, sticky="we")
             statusVar2.set(values[6] if values[6] else "Active")
