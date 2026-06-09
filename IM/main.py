@@ -6,18 +6,19 @@ UNIFORM_FONT = ("Segoe UI", 10)
 
 WHITE      = "#ffffff"
 BLACK      = "#000000"
-HEADER_BG  = "#eae8f0"
-ROW_ALT    = "#f7f6fb"
-ROW_SEL    = "#dcd8f0"
-BORDER     = "#dde0ee"
-FG_DARK    = "#1a1a2e"
-FG_MUTED   = "#9aa3c2"
+HEADER_BG  = "#23b3d3"   
+ROW_ALT    = "#f7f9fa"  
+ROW_SEL    = "#49bbd8"   
+BORDER     = "#1d9bb7"  
+FG_DARK    = "#116e82"   
+FG_MUTED   = "#64c3dc" 
 
-font_color_sidebar = "white"
-sidebar_color = "#8A5F41"
-active_color  = "#A77F60"
-content_color = "#F3E4C9"
-black = "#070707"
+
+font_color_sidebar = "#ffffff"   
+sidebar_color      = "#17849c"
+active_color       = "#23b3d3"   
+content_color      = "#f7f9fa"   
+black              = "#070707"   
 
 def main():
     root = tk.Tk()

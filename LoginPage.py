@@ -220,15 +220,16 @@ def login_page():
     root.mainloop()
 
 # ── Colours ───────────────────────────────────────────────────────────
-BG          = "#1C1A17"          # near-black warm background
-PANEL       = "#26231F"          # slightly lighter card panel
-ACCENT      = "#C8915A"          # warm amber — matches sidebar_color family
-ACCENT_DARK = "#A77040"          # hover / pressed state
-WHITE       = "#F5F0EA"          # off-white text
-MUTED       = "#7A7167"          # placeholder / hint text
-BORDER      = "#3A352E"          # subtle input border
-INPUT_BG    = "#2E2A25"          # input field background
-ERR         = "#E05A5A"          # error red
+BG = "#116e82"          # deep teal background
+PANEL = "#64c3dc"       # lighter aqua panel for login area
+ACCENT = "#23b3d3"      # main brand accent
+ACCENT_DARK = "#17849c" # darker accent for hover/pressed
+WHITE = "#ffffff"       # text stays crisp and readable
+MUTED = "#17849c"       # Was "#7acae1" -> Changed to a dark slate/teal so text stands out on the aqua panel
+BORDER = "#116e82"      # Was "#49bbd8" -> Changed to a darker shade to clearly see the text box boundaries
+INPUT_BG = "#ffffff"
+ERR = "#d34323"   # strong red-orange for errors
+
 
 DB_NAME = "dorm_management.db"
 
@@ -368,7 +369,7 @@ def login_page():
         # dark gradient strip at bottom
         for i in range(180):
             alpha_hex = format(min(255, int(i * 1.4)), "02x")
-            color = f"#1c1a17"
+            color = f"#17849c"
             canvas.create_line(0, 560-180+i, 400, 560-180+i, fill=color)
         canvas.create_text(32, 390, anchor="sw",
                            text="🏠  Dormi", fill=WHITE,
@@ -385,7 +386,7 @@ def login_page():
         tk.Label(left, text="Dormi", font=("Georgia", 30, "bold"),
                  bg=ACCENT, fg=WHITE).pack()
         tk.Label(left, text="Dormitory\nManagement System",
-                 font=("Segoe UI", 11), bg=ACCENT, fg="#1C1A17",
+                 font=("Segoe UI", 11), bg=ACCENT, fg="#17849c",
                  justify="center").pack(pady=(8, 0))
 
         # decorative bottom strip
