@@ -536,11 +536,15 @@ class main(tk.Tk):
             bind_hover(btn)
         
         #LOGOUT BUTTON
+        def confirm_logout():
+            if messagebox.askyesno("Log Out", "Are you sure you want to log out?"):
+                self.destroy()
+
         tk.Button(self.sidebar, text="⏻  Log Out",
-          bg="#c0392b", fg="white", font=("Arial", 10),
-          relief="flat", anchor="w", padx=10, pady=8,
-          cursor="hand2", command=self.destroy).pack(
-              side="bottom", fill="x", padx=10, pady=(0, 15))
+        bg="#c0392b", fg="white", font=("Arial", 10),
+        relief="flat", anchor="w", padx=10, pady=8,
+        cursor="hand2", command=confirm_logout).pack(
+            side="bottom", fill="x", padx=10, pady=(0, 15))
 
     def refresh_dashboard(self):
         ts, tr, tc = self.db.for_dashboard()
