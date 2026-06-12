@@ -281,27 +281,26 @@ class Database:
                     FirstName     VARCHAR(255) NOT NULL,
                     MiddleInitial VARCHAR(255),
                     Email          VARCHAR(255) UNIQUE NOT NULL,
-                    Contact        VARCHAR(255) NOT NULL,
-                    FullName      VARCHAR(255) NOT NULL
+                    Contact        VARCHAR(255) NOT NULL
                 )
             """)
             con.commit()
 
-    def insert_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
+    def insert_cleaning_staff(self, StaffID, last, first, mi, Email, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO CleaningStaff VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (StaffID, last, first, mi, Email, Contact, FullName)
+                "INSERT INTO CleaningStaff VALUES (?, ?, ?, ?, ?, ?)",
+                (StaffID, last, first, mi, Email, Contact)
             )
             con.commit()
 
-    def update_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
+    def update_cleaning_staff(self, StaffID, last, first, mi, Email, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
                 UPDATE CleaningStaff
-                SET LastName=?, FirstName=?, MiddleInitial=?, Email=?, Contact=?, FullName=?
+                SET LastName=?, FirstName=?, MiddleInitial=?, Email=?, Contact=?
                 WHERE StaffID=?
-            """, (last, first, mi, Email, Contact, FullName, StaffID))
+            """, (last, first, mi, Email, Contact, StaffID))
             con.commit()
 
     def delete_cleaning_staff(self, StaffID):
@@ -318,7 +317,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                        SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                        SELECT cs.StaffID, cs.LastName || ', ' || cs.FirstName, cs.Contact, cs.Email,
                             COUNT(sch.Id) AS assignments
                         FROM CleaningStaff cs
                         LEFT JOIN cleaning_schedule sch 
@@ -330,7 +329,7 @@ class Database:
                                     CAST(sch.Day AS INT))
                             ) >= date('now')
                         GROUP BY cs.StaffID
-                        ORDER BY cs.FullName
+                        ORDER BY cs.LastName || ', ' || cs.FirstName
                     """)
 
             for row in cur.fetchall():
@@ -406,7 +405,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute("""
-                SELECT cs.StaffID, cs.FullName,
+                SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS StaffName,
                     sch.Building || ' ' || sch.Room,
                     sch.TimeStart, sch.TimeEnd,
                     sch.Month || '/' || sch.Day || '/' || sch.Year
@@ -1569,7 +1568,7 @@ class main(tk.Tk):
                             selected_cs_name.set(fullname_val)
                     else:
                         self.db.insert_cleaning_staff(id_val, last_val, first_val, mi_val,
-                                                      email_val, contact_val, fullname_val)
+                                                      email_val, contact_val)
                     reload_master()
                     update_detail_header()
                     self.refresh_dashboard()
@@ -1855,11 +1854,11 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                    SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS FullName, cs.Contact, cs.Email,
                            COUNT(sch.Id)
                     FROM CleaningStaff cs
                     LEFT JOIN cleaning_schedule sch ON cs.StaffID = sch.StaffID
-                    WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FullName) LIKE ?
+                    WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FirstName || ' ' || cs.LastName) LIKE ?
                     GROUP BY cs.StaffID
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall():
