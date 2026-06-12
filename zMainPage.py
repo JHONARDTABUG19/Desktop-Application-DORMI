@@ -7,22 +7,46 @@ import shutil
 import os
 from datetime import datetime
 
+# UNIFORM_FONT = ("Segoe UI", 10)
+
+# WHITE     = "#ffffff"
+# BLACK     = "#000000"
+# HEADER_BG = "#eae8f0"
+# ROW_ALT   = "#f7f6fb"
+# ROW_SEL   = "#dcd8f0"
+# BORDER    = "#dde0ee"
+# FG_DARK   = "#1a1a2e"
+# FG_MUTED  = "#9aa3c2"
+
+# font_color_sidebar = "white"
+# sidebar_color = "#8A5F41"
+# active_color  = "#A77F60"
+# content_color = "#F3E4C9"
+# black = "#070707"
+
 UNIFORM_FONT = ("Segoe UI", 10)
+BOLD_BTN_FONT = ("Segoe UI", 10, "bold")
 
-WHITE     = "#ffffff"
-BLACK     = "#000000"
-HEADER_BG = "#eae8f0"
-ROW_ALT   = "#f7f6fb"
-ROW_SEL   = "#dcd8f0"
-BORDER    = "#dde0ee"
-FG_DARK   = "#1a1a2e"
-FG_MUTED  = "#9aa3c2"
+WHITE      = "#ffffff"
+BLUE       = "#013f9c"
+BLACK      = "#000000"
+HEADER_BG  = "#8fd2e5"   
+ROW_ALT    = "#f7f9fa"  
+ROW_SEL    = "#49bbd8"   
+BORDER     = "#1d9bb7"  
+FG_DARK    = "#116e82"   
+FG_MUTED   = "#64c3dc" 
 
-font_color_sidebar = "white"
-sidebar_color = "#8A5F41"
-active_color  = "#A77F60"
-content_color = "#F3E4C9"
-black = "#070707"
+GREEN_BTN  = "#27ae60"
+GREEN_HOVER= "#219653"
+RED_BTN    = "#c0392b"
+RED_HOVER  = "#a83226"
+
+font_color_sidebar = "#ffffff"   
+sidebar_color      = "#17849c"
+active_color       = "#23b3d3"   
+content_color      = "#f7f9fa"   
+black              = "#070707"  
 
 DB_NAME = "dorm_management.db"
 
@@ -257,27 +281,26 @@ class Database:
                     FirstName     VARCHAR(255) NOT NULL,
                     MiddleInitial VARCHAR(255),
                     Email          VARCHAR(255) UNIQUE NOT NULL,
-                    Contact        VARCHAR(255) NOT NULL,
-                    FullName      VARCHAR(255) NOT NULL
+                    Contact        VARCHAR(255) NOT NULL
                 )
             """)
             con.commit()
 
-    def insert_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
+    def insert_cleaning_staff(self, StaffID, last, first, mi, Email, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO CleaningStaff VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (StaffID, last, first, mi, Email, Contact, FullName)
+                "INSERT INTO CleaningStaff VALUES (?, ?, ?, ?, ?, ?)",
+                (StaffID, last, first, mi, Email, Contact)
             )
             con.commit()
 
-    def update_cleaning_staff(self, StaffID, last, first, mi, Email, Contact, FullName):
+    def update_cleaning_staff(self, StaffID, last, first, mi, Email, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
                 UPDATE CleaningStaff
-                SET LastName=?, FirstName=?, MiddleInitial=?, Email=?, Contact=?, FullName=?
+                SET LastName=?, FirstName=?, MiddleInitial=?, Email=?, Contact=?
                 WHERE StaffID=?
-            """, (last, first, mi, Email, Contact, FullName, StaffID))
+            """, (last, first, mi, Email, Contact, StaffID))
             con.commit()
 
     def delete_cleaning_staff(self, StaffID):
@@ -294,7 +317,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                        SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                        SELECT cs.StaffID, cs.LastName || ', ' || cs.FirstName, cs.Contact, cs.Email,
                             COUNT(sch.Id) AS assignments
                         FROM CleaningStaff cs
                         LEFT JOIN cleaning_schedule sch 
@@ -306,7 +329,7 @@ class Database:
                                     CAST(sch.Day AS INT))
                             ) >= date('now')
                         GROUP BY cs.StaffID
-                        ORDER BY cs.FullName
+                        ORDER BY cs.LastName || ', ' || cs.FirstName
                     """)
 
             for row in cur.fetchall():
@@ -382,7 +405,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute("""
-                SELECT cs.StaffID, cs.FullName,
+                SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS StaffName,
                     sch.Building || ' ' || sch.Room,
                     sch.TimeStart, sch.TimeEnd,
                     sch.Month || '/' || sch.Day || '/' || sch.Year
@@ -520,7 +543,7 @@ class main(tk.Tk):
 
         self.show_page(self.dashboard_page, self.dashboardButton)
 
-        hover_color = "#BE9C7C"
+        hover_color = "#153769"
 
         def bind_hover(btn):
             def on_enter(e):
@@ -541,7 +564,7 @@ class main(tk.Tk):
                 self.destroy()
 
         tk.Button(self.sidebar, text="⏻  Log Out",
-        bg="#c0392b", fg="white", font=("Arial", 10),
+        bg="#c0392b", fg="white", font=BOLD_BTN_FONT,
         relief="flat", anchor="w", padx=10, pady=8,
         cursor="hand2", command=confirm_logout).pack(
             side="bottom", fill="x", padx=10, pady=(0, 15))
@@ -790,10 +813,10 @@ class main(tk.Tk):
 
             bottomFrame = tk.Frame(win, bg=content_color)
             bottomFrame.pack(fill="x", padx=15, pady=(0, 20))
-            tk.Button(bottomFrame, text="Save",   font=UNIFORM_FONT, bg=BLACK, fg=WHITE,
+            tk.Button(bottomFrame, text="Save",   font=BOLD_BTN_FONT, bg=GREEN_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=0, cursor="hand2",
                       command=save).pack(side="right", padx=5)
-            tk.Button(bottomFrame, text="Cancel", font=UNIFORM_FONT, fg="#c0392b",
+            tk.Button(bottomFrame, text="Cancel", font=BOLD_BTN_FONT, bg=RED_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=0, cursor="hand2",
                       command=win.destroy).pack(side="right", padx=5)
 
@@ -893,10 +916,10 @@ class main(tk.Tk):
 
             bottomFrame = tk.Frame(win, bg=content_color)
             bottomFrame.pack(fill="x", padx=15, pady=10)
-            tk.Button(bottomFrame, text="Assign", font=UNIFORM_FONT, bg=BLACK, fg=WHITE,
+            tk.Button(bottomFrame, text="Assign", font=BOLD_BTN_FONT, bg=GREEN_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=save_room).pack(side="right", padx=(5, 0))
-            tk.Button(bottomFrame, text="Cancel", font=UNIFORM_FONT, fg="#c0392b",
+            tk.Button(bottomFrame, text="Cancel", font=BOLD_BTN_FONT, bg=RED_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=win.destroy).pack(side="right")
 
@@ -914,11 +937,11 @@ class main(tk.Tk):
             def confirm():
                 result[0] = True
                 win.destroy()
-            tk.Button(btn_row, text="Delete", bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
+            tk.Button(btn_row, text="Delete", bg="#c0392b", fg=WHITE, font=BOLD_BTN_FONT,
                       relief="flat", padx=14, pady=4, cursor="hand2",
                       command=confirm).pack(side="left", padx=6)
-            tk.Button(btn_row, text="Cancel", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
-                      relief="solid", bd=1, padx=14, pady=4, cursor="hand2",
+            tk.Button(btn_row, text="Cancel", bg=BLUE, fg=WHITE, font=BOLD_BTN_FONT,
+                      relief="solid", bd=0, padx=14, pady=4, cursor="hand2",
                       command=win.destroy).pack(side="left", padx=6)
             win.grab_set()
             win.wait_window()
@@ -929,8 +952,8 @@ class main(tk.Tk):
         topbar.pack(fill="x", padx=28, pady=(20, 12))
         tk.Label(topbar, text="Students", bg=content_color, fg=FG_DARK,
                  font=("Segoe UI", 17, "bold")).pack(side="left")
-        tk.Button(topbar, text="+ Add student", bg=WHITE, fg=FG_DARK,
-                  font=UNIFORM_FONT, relief="solid", bd=1, padx=12, pady=5,
+        tk.Button(topbar, text="+ Add student", bg=GREEN_BTN, fg=WHITE,
+                  font=BOLD_BTN_FONT, relief="solid", bd=0, padx=12, pady=5,
                   cursor="hand2", command=add_student_window).pack(side="right")
 
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
@@ -1027,13 +1050,15 @@ class main(tk.Tk):
             n = len(self.tree.get_children())
             self.count_label.config(text=f"{n} student{'s' if n != 1 else ''}")
 
-        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
-                       relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+        btn_cfg = dict(bg=BLUE, fg=WHITE, font=BOLD_BTN_FONT,
+                       relief="solid", bd=0, padx=14, pady=5, cursor="hand2")
         tk.Button(action_bar, text="✏  Edit",        command=edit_student,  **btn_cfg).pack(side="right", padx=4)
-        tk.Button(action_bar, text="⊞  Assign Room", command=assign_room,   **btn_cfg).pack(side="right", padx=4)
+        tk.Button(action_bar, text="⊞  Assign Room", command=assign_room,
+                  bg=GREEN_BTN, fg=WHITE, font=BOLD_BTN_FONT,
+                       relief="solid", bd=0, padx=14, pady=5, cursor="hand2").pack(side="right", padx=4)
         tk.Button(action_bar, text="🗑  Delete",
-                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                  relief="solid", bd=1, padx=14, pady=5, cursor="hand2",
+                  bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
+                  relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
                   command=delete_student).pack(side="right", padx=4)
 
         tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
@@ -1056,9 +1081,9 @@ class main(tk.Tk):
             btn_row = tk.Frame(win, bg=WHITE); btn_row.pack()
             def confirm():
                 result[0] = True; win.destroy()
-            tk.Button(btn_row, text="Delete", bg="#c0392b", fg=WHITE, font=UNIFORM_FONT,
+            tk.Button(btn_row, text="Delete", bg="#c0392b", fg=WHITE, font=BOLD_BTN_FONT,
                       relief="flat", padx=14, pady=4, cursor="hand2", command=confirm).pack(side="left", padx=6)
-            tk.Button(btn_row, text="Cancel", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
+            tk.Button(btn_row, text="Cancel", bg=WHITE, fg=FG_DARK, font=BOLD_BTN_FONT,
                       relief="solid", bd=1, padx=14, pady=4, cursor="hand2",
                       command=win.destroy).pack(side="left", padx=6)
             win.grab_set(); win.wait_window(); return result[0]
@@ -1067,8 +1092,8 @@ class main(tk.Tk):
         topbar.pack(fill="x", padx=28, pady=(20, 12))
         tk.Label(topbar, text="Rooms", bg=content_color, fg=FG_DARK,
                  font=("Segoe UI", 17, "bold")).pack(side="left")
-        add_btn = tk.Button(topbar, text="+ Add Room", bg=WHITE, fg=FG_DARK,
-                            font=UNIFORM_FONT, relief="solid", bd=1, padx=12, pady=5, cursor="hand2")
+        add_btn = tk.Button(topbar, text="+ Add Room", bg=GREEN_BTN, fg=WHITE,
+                            font=BOLD_BTN_FONT, relief="solid", bd=0, padx=12, pady=5, cursor="hand2")
         add_btn.pack(side="right")
 
         card = tk.Frame(page, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
@@ -1281,10 +1306,10 @@ class main(tk.Tk):
 
             bf = tk.Frame(win, bg=content_color)
             bf.pack(fill="x", padx=15, pady=15)
-            tk.Button(bf, text="Save", font=UNIFORM_FONT, bg=BLACK, fg=WHITE,
+            tk.Button(bf, text="Save", font=BOLD_BTN_FONT, bg=GREEN_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=save_room).pack(side="right", padx=(5, 0))
-            tk.Button(bf, text="Cancel", font=UNIFORM_FONT, fg="#c0392b",
+            tk.Button(bf, text="Cancel", font=BOLD_BTN_FONT, bg=RED_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=win.destroy).pack(side="right")
 
@@ -1338,13 +1363,13 @@ class main(tk.Tk):
                       command=win.destroy).pack(side="right")
 
         add_btn.config(command=add_room_window)
-        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
-                       relief="solid", bd=1, padx=14, pady=5, cursor="hand2")
+        btn_cfg = dict(bg=BLUE, fg=WHITE, font=BOLD_BTN_FONT,
+                       relief="solid", bd=0, padx=14, pady=5, cursor="hand2")
         tk.Button(action_bar, text="✏  Edit",         command=edit_room,         **btn_cfg).pack(side="right", padx=4)
         tk.Button(action_bar, text="⊞  View details", command=view_room_details, **btn_cfg).pack(side="right", padx=4)
         tk.Button(action_bar, text="🗑  Delete",
-                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                  relief="solid", bd=1, padx=14, pady=5, cursor="hand2",
+                  bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
+                  relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
                   command=delete_room).pack(side="right", padx=4)
 
         tk.Label(card, text="ⓘ  Click a row to select before editing, viewing details, or deleting.",
@@ -1543,7 +1568,7 @@ class main(tk.Tk):
                             selected_cs_name.set(fullname_val)
                     else:
                         self.db.insert_cleaning_staff(id_val, last_val, first_val, mi_val,
-                                                      email_val, contact_val, fullname_val)
+                                                      email_val, contact_val)
                     reload_master()
                     update_detail_header()
                     self.refresh_dashboard()
@@ -1553,10 +1578,10 @@ class main(tk.Tk):
 
             bf = tk.Frame(win, bg=content_color)
             bf.pack(fill="x", padx=15, pady=15)
-            tk.Button(bf, text="Save", font=UNIFORM_FONT, bg=BLACK, fg=WHITE,
+            tk.Button(bf, text="Save", font=BOLD_BTN_FONT, bg=GREEN_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=save).pack(side="right", padx=(5, 0))
-            tk.Button(bf, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
+            tk.Button(bf, text="Cancel", font=BOLD_BTN_FONT, bg=RED_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=win.destroy).pack(side="right")
 
@@ -1737,10 +1762,10 @@ class main(tk.Tk):
 
             bf = tk.Frame(win, bg=content_color)
             bf.pack(fill="x", padx=15, pady=15)
-            tk.Button(bf, text="Confirm", font=UNIFORM_FONT, bg=BLACK, fg=WHITE,
+            tk.Button(bf, text="Confirm", font=BOLD_BTN_FONT, bg=GREEN_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=confirm_assign).pack(side="right", padx=(5, 0))
-            tk.Button(bf, text="Cancel", fg="#c0392b", font=UNIFORM_FONT,
+            tk.Button(bf, text="Cancel", font=BOLD_BTN_FONT, bg=RED_BTN, fg=WHITE,
                       relief="flat", padx=12, pady=5, cursor="hand2",
                       command=win.destroy).pack(side="right")
 
@@ -1793,7 +1818,7 @@ class main(tk.Tk):
         tk.Label(topbar, text="Cleaning Staff", bg=content_color, fg=FG_DARK,
                  font=("Segoe UI", 17, "bold")).pack(side="left")
         tk.Button(topbar, text="+ Add Staff", command=lambda: open_staff_window(),
-                  bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT, relief="solid", bd=1,
+                  bg=GREEN_BTN, fg=WHITE, font=BOLD_BTN_FONT, relief="solid", bd=0,
                   padx=12, pady=5, cursor="hand2").pack(side="right")
 
         # ══════════════════════════════════════════════════════════════
@@ -1829,11 +1854,11 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT cs.StaffID, cs.FullName, cs.Contact, cs.Email,
+                    SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS FullName, cs.Contact, cs.Email,
                            COUNT(sch.Id)
                     FROM CleaningStaff cs
                     LEFT JOIN cleaning_schedule sch ON cs.StaffID = sch.StaffID
-                    WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FullName) LIKE ?
+                    WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FirstName || ' ' || cs.LastName) LIKE ?
                     GROUP BY cs.StaffID
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall():
@@ -1898,13 +1923,13 @@ class main(tk.Tk):
         master_action = tk.Frame(master_card, bg=WHITE)
         master_action.pack(fill="x", padx=16, pady=8)
 
-        btn_cfg = dict(bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT,
-                       relief="solid", bd=1, padx=12, pady=4, cursor="hand2")
-        tk.Button(master_action, text="✏  Edit staff",
+        btn_cfg = dict(bg=BLUE, fg=WHITE, font=BOLD_BTN_FONT,
+                       relief="solid", bd=0, padx=12, pady=4, cursor="hand2")
+        tk.Button(master_action, text="✏  Edit Staff",
                   command=edit_staff, **btn_cfg).pack(side="right", padx=4)
-        tk.Button(master_action, text="🗑  Delete staff",
-                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                  relief="solid", bd=1, padx=12, pady=4, cursor="hand2",
+        tk.Button(master_action, text="🗑  Delete Staff",
+                  bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
+                  relief="solid", bd=0, padx=12, pady=4, cursor="hand2",
                   command=delete_staff).pack(side="right", padx=4)
         tk.Label(master_action,
                  text="ⓘ  Click a staff row to load their cleaning schedule below.",
@@ -1926,7 +1951,7 @@ class main(tk.Tk):
 
         tk.Button(detail_hdr, text="+ Assign Cleaning",
                   command=open_assign_window,
-                  bg=sidebar_color, fg=WHITE, font=UNIFORM_FONT,
+                  bg=GREEN_BTN, fg=WHITE, font=BOLD_BTN_FONT,
                   relief="flat", padx=12, pady=4, cursor="hand2").pack(side="right")
 
         tk.Frame(detail_card, bg=BORDER, height=1).pack(fill="x", padx=16)
@@ -1970,8 +1995,8 @@ class main(tk.Tk):
         detail_hint_lbl.pack(side="left")
 
         tk.Button(detail_action, text="✕  Remove assignment",
-                  bg=WHITE, fg="#c0392b", font=UNIFORM_FONT,
-                  relief="solid", bd=1, padx=12, pady=4, cursor="hand2",
+                  bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
+                  relief="solid", bd=0, padx=12, pady=4, cursor="hand2",
                   command=remove_schedule).pack(side="right", padx=4)
 
         # ── initial load ──────────────────────────────────────────────
