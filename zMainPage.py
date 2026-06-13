@@ -7,23 +7,6 @@ import shutil
 import os
 from datetime import datetime
 
-# UNIFORM_FONT = ("Segoe UI", 10)
-
-# WHITE     = "#ffffff"
-# BLACK     = "#000000"
-# HEADER_BG = "#eae8f0"
-# ROW_ALT   = "#f7f6fb"
-# ROW_SEL   = "#dcd8f0"
-# BORDER    = "#dde0ee"
-# FG_DARK   = "#1a1a2e"
-# FG_MUTED  = "#9aa3c2"
-
-# font_color_sidebar = "white"
-# sidebar_color = "#8A5F41"
-# active_color  = "#A77F60"
-# content_color = "#F3E4C9"
-# black = "#070707"
-
 UNIFORM_FONT = ("Segoe UI", 10)
 BOLD_BTN_FONT = ("Segoe UI", 10, "bold")
 
@@ -114,8 +97,8 @@ class Database:
     def add_student(self, StudentNo, last, first, mi, Program, Status, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (StudentNo, last, first, mi, Program, Status, Contact, "", "")
+                "INSERT INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (StudentNo, last, first, mi, Program, Status, Contact, "", "", "", "")
             )
             con.commit()
 
@@ -127,7 +110,7 @@ class Database:
             cur.execute("""
                 SELECT StudentNo,
                     TRIM(FirstName || ' ' || COALESCE(MiddleInitial || '. ', '') || LastName),
-                    Program, Contact, Building, Room, Status
+                    Program, Contact, Building, Room, Status, RoomStartDate, RoomEndDate
                 FROM Students
             """)
             for row in cur.fetchall():
@@ -150,23 +133,46 @@ class Database:
 
     def migrate_students_table(self):
         with sqlite3.connect(DB_NAME) as con:
-            try:
-                con.execute("ALTER TABLE Students ADD COLUMN Room VARCHAR(255) DEFAULT ''")
-                con.execute("ALTER TABLE Students ADD COLUMN Building VARCHAR(255) DEFAULT ''")
-                con.commit()
-            except Exception:
-                pass
+            for col_sql in (
+                "ALTER TABLE Students ADD COLUMN Room VARCHAR(255) DEFAULT ''",
+                "ALTER TABLE Students ADD COLUMN Building VARCHAR(255) DEFAULT ''",
+                "ALTER TABLE Students ADD COLUMN RoomStartDate VARCHAR(255) DEFAULT ''",
+                "ALTER TABLE Students ADD COLUMN RoomEndDate VARCHAR(255) DEFAULT ''",
+            ):
+                try:
+                    con.execute(col_sql)
+                    con.commit()
+                except Exception:
+                    pass
 
-    def assign_room_to_student(self, StudentNo, Room, Building):
+    def update_expired_room_statuses(self):
+        """
+        Sets Status='Inactive' for any student whose RoomEndDate has passed
+        (RoomEndDate < today) and is still marked 'Active'.
+        Expects RoomEndDate in 'YYYY-MM-DD' format.
+        """
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute("""
+                UPDATE Students
+                SET Status='Inactive'
+                WHERE Status='Active'
+                  AND RoomEndDate IS NOT NULL
+                  AND RoomEndDate != ''
+                  AND date(RoomEndDate) < date('now')
+            """)
+            con.commit()
+
+    def assign_room_to_student(self, StudentNo, Room, Building, RoomStartDate, RoomEndDate):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("UPDATE Students SET Room=?, Building=? WHERE StudentNo=?",
-                        (Room, Building, StudentNo))
+            cur.execute("UPDATE Students SET Room=?, Building=?, RoomStartDate=?, RoomEndDate=? WHERE StudentNo=?",
+                        (Room, Building, RoomStartDate, RoomEndDate, StudentNo))
             cur.execute("UPDATE Rooms SET Occupants = Occupants + 1 WHERE RoomNumber=? AND Building=?",
                         (Room, Building))
             cur.execute("""UPDATE Rooms SET Status='Occupied'
                            WHERE RoomNumber=? AND Building=? AND Occupants >= Capacity""",
                         (Room, Building))
+
             con.commit()
 
     def remove_student_from_room(self, StudentNo):
@@ -181,7 +187,7 @@ class Database:
                 cur.execute("""UPDATE Rooms SET Status='Vacant'
                                WHERE RoomNumber=? AND Building=? AND Occupants < Capacity AND Status='Occupied'""",
                             (Room, Building))
-                cur.execute("UPDATE Students SET Room='', Building='' WHERE StudentNo=?", (StudentNo,))
+                cur.execute("UPDATE Students SET Room='', Building='', RoomStartDate='', RoomEndDate='' WHERE StudentNo=?", (StudentNo,))
             con.commit()
 
     def seed_sample_students(self):
@@ -203,8 +209,8 @@ class Database:
                 ("2022-00005", "Mendoza",    "Luis",     "T", "BSBA",  "Active",   "09945677890"),
             ]
             cur.executemany(
-                "INSERT OR IGNORE INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(s[0], s[1], s[2], s[3], s[4], s[5], s[6], "", "") for s in sample]
+                "INSERT OR IGNORE INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(s[0], s[1], s[2], s[3], s[4], s[5], s[6], "", "", "", "") for s in sample]
             )
             con.commit()
 
@@ -454,6 +460,7 @@ class main(tk.Tk):
         self.db.create_table_cleaning_staff()
         self.db.create_cleaning_schedule_table()
         self.db.migrate_students_table()
+        self.db.update_expired_room_statuses()
         
         
         self.db.seed_sample_students()
@@ -851,7 +858,7 @@ class main(tk.Tk):
             win = tk.Toplevel()
             win.title("Assign Room")
             win.config(bg=content_color)
-            win.geometry("360x400")
+            win.geometry("360x500")
             win.resizable(False, False)
             win.grab_set()
 
@@ -902,15 +909,29 @@ class main(tk.Tk):
             statusDrop2.grid(row=6, column=0, sticky="we")
             statusVar2.set(values[6] if values[6] else "Active")
 
+            def validate_date_input(P):
+                # Allow only digits and dashes (for YYYY-MM-DD typing)
+                return all(c.isdigit() or c == "-" for c in P)
+
+            vcmd_date = (win.register(validate_date_input), "%P")
+
+            tk.Label(midFrame, text="Start Date (YYYY-MM-DD)", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=7, column=0, sticky="w", pady=(0, 4))
+            startDateEntry = tk.Entry(midFrame, font=UNIFORM_FONT,
+                                       validate="key", validatecommand=vcmd_date)
+            startDateEntry.grid(row=8, column=0, sticky="we", padx=(0, 4))
+
+            tk.Label(midFrame, text="End Date (YYYY-MM-DD)", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(row=9, column=0, sticky="w", pady=(0, 4))
+            endDateEntry = tk.Entry(midFrame, font=UNIFORM_FONT,
+                                     validate="key", validatecommand=vcmd_date)
+            endDateEntry.grid(row=10, column=0, sticky="we", padx=(0, 4), pady=(0, 12))
+
             def save_room():
                 if not buildingVar.get() or not roomVar.get():
                     return
-                self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get())
+                self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get(), startDateEntry.get(), endDateEntry.get())
+                self.db.update_expired_room_statuses()
                 self.db.get_all_rooms(self.rooms_tree)
-                self.tree.item(selected[0], values=(
-                    values[0], values[1], values[2], values[3],
-                    buildingVar.get(), roomVar.get(), statusVar2.get()
-                ))
+                self.db.get_all_students(self.tree)
                 self.refresh_dashboard()
                 win.destroy()
 
@@ -1022,17 +1043,19 @@ class main(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=16)
 
         self.tree = ttk.Treeview(tree_frame,
-                         columns=("StudentNo", "name", "Program", "Contact", "Building", "Room", "Status"),
-                         displaycolumns=("StudentNo", "name", "Program", "Building", "Room", "Status"),
+                         columns=("StudentNo", "name", "Program", "Contact", "Building", "Room", "Status", "StartDate", "EndDate"),
+                         displaycolumns=("StudentNo", "name", "Program", "Building", "Room", "StartDate", "EndDate", "Status"),
                          show="headings", style="Students.Treeview", selectmode="browse")
         for cid, heading, width, anchor in [
             ("StudentNo", "Student no.", 120, "w"), ("name", "Name", 190, "w"),
             ("Program", "Program", 100, "center"),
-            ("Building", "Building", 100, "center"), ("Room", "Room", 80, "center"),
-            ("Status", "Status", 100, "center")
-        ]:
+            ("Building", "Building", 100, "center"), ("Room", "Room", 80, "center"),("StartDate", "Start", 100, "center"), 
+            ("EndDate", "End", 100, "center"), ("Status", "Status", 100, "center")
+           ]:
             self.tree.heading(cid, text=heading, anchor=anchor)
             self.tree.column(cid, width=width, anchor=anchor, stretch=True)
+
+            
 
         sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
@@ -1064,6 +1087,7 @@ class main(tk.Tk):
         tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
+        self.db.update_expired_room_statuses()
         self.db.get_all_students(self.tree)
         update_count()
 
@@ -1292,6 +1316,8 @@ class main(tk.Tk):
                 room_no = roomNumEntry.get().strip()
                 if not room_no:
                     err_label.config(text="Room number is required."); return
+
+
                 if edit_item:
                     RoomID = self.rooms_tree.item(edit_item, "tags")[0]
                     self.db.update_room(RoomID, buildingVar.get(), room_no,
@@ -1640,36 +1666,20 @@ class main(tk.Tk):
 
             bldDrop.bind("<<ComboboxSelected>>", on_bld_change)
 
-            # Month (cols 0-1) / Day (cols 2-3) / Year (cols 4-5)
-            # Added the limit (12, 31, 9999) as the last item in each tuple
-            for col_s, colspan, label, var_name, limit in [
-                (0, 2, "Month", "Month", 12),
-                (2, 2, "Day",   "Day",   31),
-                (4, 2, "Year",  "Year",  9999),
-            ]:
-                grp = tk.Frame(midFrame, bg=WHITE)
-                grp.grid(row=2, column=col_s, columnspan=colspan, sticky="we",
-                         padx=(0, 4) if col_s == 0 else (4, 4) if col_s == 2 else (4, 0),
-                         pady=(0, 12))
-                
-                tk.Label(grp, text=label, bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).pack(anchor="w", pady=(0, 2))
-                
-                bdr = tk.Frame(grp, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
-                bdr.pack(fill="x")
-                
-                ent = tk.Entry(bdr, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
-                               validate="key", 
-                               validatecommand=(vcmd_range, "%P", limit),
-                               relief="flat", bd=0, insertbackground=FG_DARK)
-                ent.pack(fill="x", padx=5, pady=4)
-                
-                # store as attribute so we can read them
-                if var_name == "Month": 
-                    month_entry = ent
-                elif var_name == "Day": 
-                    day_entry = ent
-                else: 
-                    year_entry = ent
+            # Date (YYYY-MM-DD) — single field, same style as Assign Room dialog
+            tk.Label(midFrame, text="Date (YYYY-MM-DD)", bg=WHITE, fg=FG_DARK, font=UNIFORM_FONT).grid(
+                row=2, column=0, columnspan=6, sticky="w", pady=(0, 2))
+
+            def validate_date_input(P):
+                return all(c.isdigit() or c == "-" for c in P)
+
+            vcmd_date = (win.register(validate_date_input), "%P")
+
+            date_entry = tk.Entry(midFrame, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                   relief="flat", bd=0, insertbackground=FG_DARK,
+                                   highlightbackground=BORDER, highlightthickness=1,
+                                   validate="key", validatecommand=vcmd_date)
+            date_entry.grid(row=3, column=0, columnspan=6, sticky="we", pady=(0, 12), ipady=4, padx=2)
 
             # Time start (cols 0-2) / Time end (cols 3-5)
 # ── TIME OPTIONS GENERATION ───────────────────────────────────
@@ -1734,21 +1744,28 @@ class main(tk.Tk):
             def confirm_assign():
                 Building = buildingVar.get().strip()
                 Room     = roomVar.get().strip()
-                Month    = month_entry.get().strip()
-                Day      = day_entry.get().strip()
-                Year     = year_entry.get().strip()
+                date_str = date_entry.get().strip()
                 t_start  = timeStartSelection.get().strip()
                 t_end    = timeEndSelection.get().strip()
 
                 if not Building or not Room:
                     err_lbl.config(text="Please select a Building and Room."); return
-                if not Month or not Day or not Year:
-                    err_lbl.config(text="Please enter a complete date."); return
+                if not date_str:
+                    err_lbl.config(text="Please enter a date (YYYY-MM-DD)."); return
                 if not t_start or not t_end:
                     err_lbl.config(text="Please select start and end times."); return
-                if int(Year) < 2026:
+
+                try:
+                    parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
+                except ValueError:
+                    err_lbl.config(text="Date must be in YYYY-MM-DD format."); return
+
+                if parsed_date.year < 2026:
                     err_lbl.config(text="Year must be 2026 or later."); return
 
+                Month = str(parsed_date.month)
+                Day   = str(parsed_date.day)
+                Year  = str(parsed_date.year)
 
                 try:
                     self.db.add_schedule(cs, Building, Room, Month, Day, Year, t_start, t_end)
@@ -2006,4 +2023,4 @@ class main(tk.Tk):
     
 if __name__ == "__main__":
     app = main()
-    app.mainloop()  
+    app.mainloop()
