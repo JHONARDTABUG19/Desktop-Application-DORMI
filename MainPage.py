@@ -463,32 +463,88 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
                 CREATE TABLE IF NOT EXISTS cleaning_schedule (
-                    Id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    StaffID      VARCHAR(255) NOT NULL,
-                    Building   VARCHAR(255) NOT NULL,
-                    Room       VARCHAR(255) NOT NULL,
-                    Month      VARCHAR(255) NOT NULL,
-                    Day        VARCHAR(255) NOT NULL,
-                    Year       VARCHAR(255) NOT NULL,
+                    Id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    StaffID   VARCHAR(255) NOT NULL,
+                    RoomID    INTEGER NOT NULL,
+                    Month     VARCHAR(255) NOT NULL,
+                    Day       VARCHAR(255) NOT NULL,
+                    Year      VARCHAR(255) NOT NULL,
                     TimeStart VARCHAR(255) NOT NULL,
-                    TimeEnd   VARCHAR(255) NOT NULL
+                    TimeEnd   VARCHAR(255) NOT NULL,
+                    FOREIGN KEY (StaffID) REFERENCES CleaningStaff(StaffID),
+                    FOREIGN KEY (RoomID)  REFERENCES Rooms(RoomID)
                 )
             """)
             con.commit()
 
+    def migrate_cleaning_schedule_table(self):
+        """
+        One-time migration: replaces Building + Room text columns in
+        cleaning_schedule with a single RoomID FK referencing Rooms(RoomID).
+        Safe to call every startup — no-op once already migrated.
+        """
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+
+            cur.execute("PRAGMA table_info(cleaning_schedule)")
+            cols = [row[1] for row in cur.fetchall()]
+            if "Building" not in cols:
+                return  # already migrated
+
+            # Carry existing text-based rows over to RoomID references
+            cur.execute("""
+                SELECT Id, StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd
+                FROM cleaning_schedule
+            """)
+            old_rows = cur.fetchall()
+
+            cur.execute("""
+                CREATE TABLE cleaning_schedule_new (
+                    Id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    StaffID   VARCHAR(255) NOT NULL,
+                    RoomID    INTEGER NOT NULL,
+                    Month     VARCHAR(255) NOT NULL,
+                    Day       VARCHAR(255) NOT NULL,
+                    Year      VARCHAR(255) NOT NULL,
+                    TimeStart VARCHAR(255) NOT NULL,
+                    TimeEnd   VARCHAR(255) NOT NULL,
+                    FOREIGN KEY (StaffID) REFERENCES CleaningStaff(StaffID),
+                    FOREIGN KEY (RoomID)  REFERENCES Rooms(RoomID)
+                )
+            """)
+
+            for row in old_rows:
+                _, staff_id, building, room, month, day, year, ts, te = row
+                cur.execute(
+                    "SELECT RoomID FROM Rooms WHERE Building=? AND RoomNumber=?",
+                    (building, room)
+                )
+                room_row = cur.fetchone()
+                if room_row:   # skip orphaned rows with no matching room
+                    cur.execute("""
+                        INSERT INTO cleaning_schedule_new
+                            (StaffID, RoomID, Month, Day, Year, TimeStart, TimeEnd)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (staff_id, room_row[0], month, day, year, ts, te))
+
+            cur.execute("DROP TABLE cleaning_schedule")
+            cur.execute("ALTER TABLE cleaning_schedule_new RENAME TO cleaning_schedule")
+            con.commit()
+
     def get_schedules_for_staff(self, StaffID, tree):
-        """Detail panel: all schedule rows for one staff member."""
+        """Detail panel: all schedule rows for one staff member, joined with Rooms."""
         for row in tree.get_children():
             tree.delete(row)
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT Id, Building, Room,
-                       Month || '/' || Day || '/' || Year,
-                       TimeStart, TimeEnd
-                FROM cleaning_schedule
-                WHERE StaffID=?
-                ORDER BY Year, Month, Day, TimeStart
+                SELECT sch.Id, r.Building, r.RoomNumber,
+                       sch.Month || '/' || sch.Day || '/' || sch.Year,
+                       sch.TimeStart, sch.TimeEnd
+                FROM cleaning_schedule sch
+                JOIN Rooms r ON r.RoomID = sch.RoomID
+                WHERE sch.StaffID = ?
+                ORDER BY sch.Year, sch.Month, sch.Day, sch.TimeStart
             """, (StaffID,))
             for i, row in enumerate(cur.fetchall(), start=1):
                 sched_id = row[0]
@@ -497,10 +553,19 @@ class Database:
 
     def add_schedule(self, StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("""
-                INSERT INTO cleaning_schedule (StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd))
+            cur = con.cursor()
+            cur.execute(
+                "SELECT RoomID FROM Rooms WHERE Building=? AND RoomNumber=?",
+                (Building, Room)
+            )
+            room_row = cur.fetchone()
+            if not room_row:
+                raise ValueError(f"Room '{Room}' in building '{Building}' not found.")
+            cur.execute("""
+                INSERT INTO cleaning_schedule
+                    (StaffID, RoomID, Month, Day, Year, TimeStart, TimeEnd)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (StaffID, room_row[0], Month, Day, Year, TimeStart, TimeEnd))
             con.commit()
 
     def delete_schedule(self, sched_id):
@@ -531,16 +596,17 @@ class Database:
             cursor = connect.cursor()
             cursor.execute("""
                 SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS StaffName,
-                    sch.Building || ' ' || sch.Room,
+                    r.Building || ' ' || r.RoomNumber,
                     sch.TimeStart, sch.TimeEnd,
                     sch.Month || '/' || sch.Day || '/' || sch.Year
                 FROM cleaning_schedule sch
                 JOIN CleaningStaff cs ON cs.StaffID = sch.StaffID
+                JOIN Rooms r          ON r.RoomID   = sch.RoomID
                 WHERE date(
                     printf('%04d-%02d-%02d',
-                        CAST(sch.Year AS INT),
+                        CAST(sch.Year  AS INT),
                         CAST(sch.Month AS INT),
-                        CAST(sch.Day AS INT))
+                        CAST(sch.Day   AS INT))
                 ) >= date('now')
                 ORDER BY sch.Year, sch.Month, sch.Day, sch.TimeStart
             """)
@@ -580,6 +646,7 @@ class main(tk.Tk):
         self.db.create_cleaning_schedule_table()
         self.db.create_room_assignments_table()
         self.db.migrate_students_table()
+        self.db.migrate_cleaning_schedule_table()
         self.db.update_expired_room_statuses()
         
         
@@ -893,7 +960,7 @@ class main(tk.Tk):
 
                 limits = [(no, 20, "Student No."), (last, 50, "Last Name"),
                           (first, 50, "First Name"), (mi, 2, "Middle Initial"),
-                          (Program, 10, "Program"), (Contact, 15, "Contact")]
+                          (Program, 10, "Program"), (Contact, 11, "Contact")]
                 for value, limit, lbl in limits:
                     if len(value) > limit:
                         err_label.config(text=f"{lbl} exceeds {limit} character limit.")
