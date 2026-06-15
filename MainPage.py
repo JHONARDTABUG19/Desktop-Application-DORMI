@@ -348,11 +348,11 @@ class Database:
             """)
             con.commit()
 
-    def add_room(self, Building, RoomNumber, Capacity, Status):
+    def add_room(self, Building, RoomNumber, Capacity, Status, Price=10000):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
                 "INSERT INTO Rooms (Building, RoomNumber, Capacity, Status, Price) VALUES (?, ?, ?, ?, ?)",
-                (Building, RoomNumber, Capacity, Status, 10000)
+                (Building, RoomNumber, Capacity, Status, Price)
             )
             con.commit()
 
@@ -365,12 +365,12 @@ class Database:
             for row in cur.fetchall():
                 tree.insert("", "end", values=row[1:], tags=(row[0],))
 
-    def update_room(self, RoomID, Building, RoomNumber, Capacity, Status):
+    def update_room(self, RoomID, Building, RoomNumber, Capacity, Status, Price=10000):
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
-                UPDATE Rooms SET Building=?, RoomNumber=?, Capacity=?, Status=?
+                UPDATE Rooms SET Building=?, RoomNumber=?, Capacity=?, Status=?, Price=?
                 WHERE RoomID=?
-            """, (Building, RoomNumber, Capacity, Status, RoomID))
+            """, (Building, RoomNumber, Capacity, Status, Price, RoomID))
             con.commit()
 
     def delete_room(self, RoomID):
@@ -1416,11 +1416,12 @@ class main(tk.Tk):
             # Row 5 — Price entry (right column only, readonly)
             priceF = tk.Frame(midFrame, bg=WHITE, highlightbackground=BORDER, highlightthickness=1)
             priceF.grid(row=5, column=1, sticky="we", padx=(6,0), pady=(0,12))
-            priceEntry = tk.Entry(priceF, bg="#f0f0f0", fg=BLACK, font=UNIFORM_FONT,
-                                relief="flat", bd=0)
+            vcmd_price = (win.register(lambda P: P == "" or P.isdigit()), "%P")
+            priceEntry = tk.Entry(priceF, bg=WHITE, fg=BLACK, font=UNIFORM_FONT,
+                                relief="flat", bd=0, insertbackground=FG_DARK,
+                                validate="key", validatecommand=vcmd_price)
             priceEntry.pack(fill="x", padx=5, pady=3)
             priceEntry.insert(0, "10000")
-            priceEntry.config(state="readonly")
 
 
             if prefill:
@@ -1428,6 +1429,8 @@ class main(tk.Tk):
                 roomNumEntry.insert(0, prefill[0])
                 capacityVar.set(str(prefill[2]))
                 statusVar.set(prefill[4])
+                priceEntry.delete(0, "end")
+                priceEntry.insert(0, str(int(float(prefill[5]))))
 
             err_label = tk.Label(win, text="", fg="#c0392b", bg=content_color, font=UNIFORM_FONT)
             err_label.pack()
@@ -1436,15 +1439,17 @@ class main(tk.Tk):
                 room_no = roomNumEntry.get().strip()
                 if not room_no:
                     err_label.config(text="Room number is required."); return
-
+                price = priceEntry.get().strip()
+                if not price:
+                    err_label.config(text="Price is required."); return
 
                 if edit_item:
                     RoomID = self.rooms_tree.item(edit_item, "tags")[0]
                     self.db.update_room(RoomID, buildingVar.get(), room_no,
-                                        int(capacityVar.get()), statusVar.get())
+                                        int(capacityVar.get()), statusVar.get(), int(price))
                 else:
                     self.db.add_room(buildingVar.get(), room_no,
-                                     int(capacityVar.get()), statusVar.get())
+                                     int(capacityVar.get()), statusVar.get(), int(price))
                 self.db.get_all_rooms(self.rooms_tree)
                 update_room_count()
                 self.refresh_dashboard()
