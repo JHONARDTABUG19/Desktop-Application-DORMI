@@ -87,9 +87,7 @@ class Database:
                     MiddleInitial  VARCHAR(255),
                     Program         VARCHAR(255) NOT NULL,
                     Status          VARCHAR(255) NOT NULL,
-                    Contact         VARCHAR(255) NOT NULL,
-                    Room            VARCHAR(255) DEFAULT '',
-                    Building        VARCHAR(255) DEFAULT ''
+                    Contact         VARCHAR(255) NOT NULL
                 )
             """)
             con.commit()
@@ -97,8 +95,8 @@ class Database:
     def add_student(self, StudentNo, last, first, mi, Program, Status, Contact):
         with sqlite3.connect(DB_NAME) as con:
             con.execute(
-                "INSERT INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (StudentNo, last, first, mi, Program, Status, Contact, "", "", "", "")
+                "INSERT INTO Students VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (StudentNo, last, first, mi, Program, Status, Contact)
             )
             con.commit()
 
@@ -108,10 +106,16 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT StudentNo,
-                    TRIM(FirstName || ' ' || COALESCE(MiddleInitial || '. ', '') || LastName),
-                    Program, Contact, Building, Room, Status, RoomStartDate, RoomEndDate
-                FROM Students
+                SELECT s.StudentNo,
+                    TRIM(s.FirstName || ' ' || COALESCE(s.MiddleInitial || '. ', '') || s.LastName),
+                    s.Program, s.Contact,
+                    COALESCE(r.Building, ''), COALESCE(r.RoomNumber, ''),
+                    s.Status,
+                    COALESCE(ra.StartDate, ''), COALESCE(ra.EndDate, '')
+                FROM Students s
+                LEFT JOIN RoomAssignments ra
+                    ON ra.StudentNo = s.StudentNo AND ra.AssignmentStatus = 'Active'
+                LEFT JOIN Rooms r ON r.RoomID = ra.RoomID
             """)
             for row in cur.fetchall():
                 tree.insert("", "end", values=row)
@@ -124,70 +128,183 @@ class Database:
                     Program=?, Status=?, Contact=?
                 WHERE StudentNo=?
             """, (StudentNo, last, first, mi, Program, Status, Contact, original_no))
+            # keep RoomAssignments pointing at the (possibly renumbered) student
+            con.execute("UPDATE RoomAssignments SET StudentNo=? WHERE StudentNo=?",
+                        (StudentNo, original_no))
+            con.commit()
+
+    def set_student_status(self, StudentNo, Status):
+        with sqlite3.connect(DB_NAME) as con:
+            con.execute("UPDATE Students SET Status=? WHERE StudentNo=?", (Status, StudentNo))
             con.commit()
 
     def delete_student(self, StudentNo):
         with sqlite3.connect(DB_NAME) as con:
+            con.execute("DELETE FROM RoomAssignments WHERE StudentNo=?", (StudentNo,))
             con.execute("DELETE FROM Students WHERE StudentNo=?", (StudentNo,))
             con.commit()
 
-    def migrate_students_table(self):
+    # ── Room Assignments (link table: StudentNo <-> RoomID) ─────────────
+    def create_room_assignments_table(self):
         with sqlite3.connect(DB_NAME) as con:
-            for col_sql in (
-                "ALTER TABLE Students ADD COLUMN Room VARCHAR(255) DEFAULT ''",
-                "ALTER TABLE Students ADD COLUMN Building VARCHAR(255) DEFAULT ''",
-                "ALTER TABLE Students ADD COLUMN RoomStartDate VARCHAR(255) DEFAULT ''",
-                "ALTER TABLE Students ADD COLUMN RoomEndDate VARCHAR(255) DEFAULT ''",
-            ):
-                try:
-                    con.execute(col_sql)
-                    con.commit()
-                except Exception:
-                    pass
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS RoomAssignments (
+                    AssignmentID     INTEGER PRIMARY KEY AUTOINCREMENT,
+                    StudentNo        VARCHAR(255) NOT NULL,
+                    RoomID           INTEGER NOT NULL,
+                    StartDate        VARCHAR(255) DEFAULT '',
+                    EndDate          VARCHAR(255) DEFAULT '',
+                    AssignmentStatus VARCHAR(255) NOT NULL DEFAULT 'Active',
+                    FOREIGN KEY (StudentNo) REFERENCES Students(StudentNo),
+                    FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID)
+                )
+            """)
+            con.commit()
+
+    def migrate_students_table(self):
+        """
+        One-time migration: moves Room/Building/RoomStartDate/RoomEndDate
+        out of Students and into RoomAssignments (a StudentNo + RoomID
+        link table), then rebuilds Students with only student-owned columns.
+        Safe to call every startup -- it's a no-op once already migrated.
+        """
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+
+            cur.execute("PRAGMA table_info(Students)")
+            existing_cols = [row[1] for row in cur.fetchall()]
+            legacy_cols = {"Room", "Building", "RoomStartDate", "RoomEndDate"}
+            has_legacy = legacy_cols.issubset(set(existing_cols))
+
+            if not has_legacy:
+                return  # already migrated
+
+            # 1) carry any existing room assignments over to RoomAssignments
+            cur.execute("""
+                SELECT StudentNo, Building, Room, RoomStartDate, RoomEndDate
+                FROM Students
+                WHERE Room != '' AND Room IS NOT NULL
+                  AND Building != '' AND Building IS NOT NULL
+            """)
+            legacy_assignments = cur.fetchall()
+
+            for StudentNo, Building, Room, StartDate, EndDate in legacy_assignments:
+                cur.execute("SELECT RoomID FROM Rooms WHERE Building=? AND RoomNumber=?",
+                            (Building, Room))
+                room_row = cur.fetchone()
+                if room_row:
+                    cur.execute("""
+                        INSERT INTO RoomAssignments (StudentNo, RoomID, StartDate, EndDate, AssignmentStatus)
+                        VALUES (?, ?, ?, ?, 'Active')
+                    """, (StudentNo, room_row[0], StartDate or "", EndDate or ""))
+
+            # 2) rebuild Students without the legacy room columns
+            cur.execute("""
+                CREATE TABLE Students_new (
+                    StudentNo      VARCHAR(255) PRIMARY KEY,
+                    LastName       VARCHAR(255) NOT NULL,
+                    FirstName      VARCHAR(255) NOT NULL,
+                    MiddleInitial  VARCHAR(255),
+                    Program         VARCHAR(255) NOT NULL,
+                    Status          VARCHAR(255) NOT NULL,
+                    Contact         VARCHAR(255) NOT NULL
+                )
+            """)
+            cur.execute("""
+                INSERT INTO Students_new (StudentNo, LastName, FirstName, MiddleInitial, Program, Status, Contact)
+                SELECT StudentNo, LastName, FirstName, MiddleInitial, Program, Status, Contact FROM Students
+            """)
+            cur.execute("DROP TABLE Students")
+            cur.execute("ALTER TABLE Students_new RENAME TO Students")
+
+            con.commit()
 
     def update_expired_room_statuses(self):
         """
-        Sets Status='Inactive' for any student whose RoomEndDate has passed
-        (RoomEndDate < today) and is still marked 'Active'.
-        Expects RoomEndDate in 'YYYY-MM-DD' format.
+        For any active room assignment whose EndDate has passed:
+          - marks the assignment 'Ended'
+          - frees up the room (Occupants - 1, Status back to 'Vacant' if no longer full)
+          - marks the student 'Inactive' if they were still 'Active'
+        Expects EndDate in 'YYYY-MM-DD' format.
         """
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("""
-                UPDATE Students
-                SET Status='Inactive'
-                WHERE Status='Active'
-                  AND RoomEndDate IS NOT NULL
-                  AND RoomEndDate != ''
-                  AND date(RoomEndDate) < date('now')
+            cur = con.cursor()
+            cur.execute("""
+                SELECT AssignmentID, StudentNo, RoomID FROM RoomAssignments
+                WHERE AssignmentStatus='Active'
+                  AND EndDate IS NOT NULL AND EndDate != ''
+                  AND date(EndDate) < date('now')
             """)
+            expired = cur.fetchall()
+
+            for assignment_id, student_no, room_id in expired:
+                cur.execute("UPDATE RoomAssignments SET AssignmentStatus='Ended' WHERE AssignmentID=?",
+                            (assignment_id,))
+                cur.execute("UPDATE Rooms SET Occupants = MAX(0, Occupants - 1) WHERE RoomID=?",
+                            (room_id,))
+                cur.execute("""UPDATE Rooms SET Status='Vacant'
+                               WHERE RoomID=? AND Occupants < Capacity AND Status='Occupied'""",
+                            (room_id,))
+                cur.execute("UPDATE Students SET Status='Inactive' WHERE StudentNo=? AND Status='Active'",
+                            (student_no,))
             con.commit()
 
     def assign_room_to_student(self, StudentNo, Room, Building, RoomStartDate, RoomEndDate):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("UPDATE Students SET Room=?, Building=?, RoomStartDate=?, RoomEndDate=? WHERE StudentNo=?",
-                        (Room, Building, RoomStartDate, RoomEndDate, StudentNo))
-            cur.execute("UPDATE Rooms SET Occupants = Occupants + 1 WHERE RoomNumber=? AND Building=?",
-                        (Room, Building))
+
+            cur.execute("SELECT RoomID FROM Rooms WHERE Building=? AND RoomNumber=?", (Building, Room))
+            room_row = cur.fetchone()
+            if not room_row:
+                con.commit()
+                return
+            new_room_id = room_row[0]
+
+            # end any current active assignment for this student (frees their old room)
+            cur.execute("""
+                SELECT AssignmentID, RoomID FROM RoomAssignments
+                WHERE StudentNo=? AND AssignmentStatus='Active'
+            """, (StudentNo,))
+            current = cur.fetchone()
+            if current:
+                old_assignment_id, old_room_id = current
+                cur.execute("UPDATE RoomAssignments SET AssignmentStatus='Ended' WHERE AssignmentID=?",
+                            (old_assignment_id,))
+                cur.execute("UPDATE Rooms SET Occupants = MAX(0, Occupants - 1) WHERE RoomID=?",
+                            (old_room_id,))
+                cur.execute("""UPDATE Rooms SET Status='Vacant'
+                               WHERE RoomID=? AND Occupants < Capacity AND Status='Occupied'""",
+                            (old_room_id,))
+
+            # create the new assignment row (StudentNo + RoomID composite link)
+            cur.execute("""
+                INSERT INTO RoomAssignments (StudentNo, RoomID, StartDate, EndDate, AssignmentStatus)
+                VALUES (?, ?, ?, ?, 'Active')
+            """, (StudentNo, new_room_id, RoomStartDate, RoomEndDate))
+
+            cur.execute("UPDATE Rooms SET Occupants = Occupants + 1 WHERE RoomID=?", (new_room_id,))
             cur.execute("""UPDATE Rooms SET Status='Occupied'
-                           WHERE RoomNumber=? AND Building=? AND Occupants >= Capacity""",
-                        (Room, Building))
+                           WHERE RoomID=? AND Occupants >= Capacity""", (new_room_id,))
 
             con.commit()
 
     def remove_student_from_room(self, StudentNo):
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            cur.execute("SELECT Room, Building FROM Students WHERE StudentNo=?", (StudentNo,))
+            cur.execute("""
+                SELECT AssignmentID, RoomID FROM RoomAssignments
+                WHERE StudentNo=? AND AssignmentStatus='Active'
+            """, (StudentNo,))
             row = cur.fetchone()
-            if row and row[0] and row[1]:
-                Room, Building = row
-                cur.execute("UPDATE Rooms SET Occupants = MAX(0, Occupants - 1) WHERE RoomNumber=? AND Building=?",
-                            (Room, Building))
+            if row:
+                assignment_id, room_id = row
+                cur.execute("UPDATE Rooms SET Occupants = MAX(0, Occupants - 1) WHERE RoomID=?",
+                            (room_id,))
                 cur.execute("""UPDATE Rooms SET Status='Vacant'
-                               WHERE RoomNumber=? AND Building=? AND Occupants < Capacity AND Status='Occupied'""",
-                            (Room, Building))
-                cur.execute("UPDATE Students SET Room='', Building='', RoomStartDate='', RoomEndDate='' WHERE StudentNo=?", (StudentNo,))
+                               WHERE RoomID=? AND Occupants < Capacity AND Status='Occupied'""",
+                            (room_id,))
+                cur.execute("UPDATE RoomAssignments SET AssignmentStatus='Ended' WHERE AssignmentID=?",
+                            (assignment_id,))
             con.commit()
 
     def seed_sample_students(self):
@@ -209,8 +326,8 @@ class Database:
                 ("2022-00005", "Mendoza",    "Luis",     "T", "BSBA",  "Active",   "09945677890"),
             ]
             cur.executemany(
-                "INSERT OR IGNORE INTO Students VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(s[0], s[1], s[2], s[3], s[4], s[5], s[6], "", "", "", "") for s in sample]
+                "INSERT OR IGNORE INTO Students VALUES (?, ?, ?, ?, ?, ?, ?)",
+                sample
             )
             con.commit()
 
@@ -398,10 +515,12 @@ class Database:
         with sqlite3.connect(DB_NAME) as connect:
             cursor = connect.cursor()
             cursor.execute("""
-                SELECT FirstName || ' ' || LastName, Building, Room, Status
-                FROM Students
-                WHERE Room != '' AND Room IS NOT NULL
-                ORDER BY Building, Room
+                SELECT TRIM(s.FirstName || ' ' || s.LastName), r.Building, r.RoomNumber, s.Status
+                FROM RoomAssignments ra
+                JOIN Students s ON s.StudentNo = ra.StudentNo
+                JOIN Rooms r ON r.RoomID = ra.RoomID
+                WHERE ra.AssignmentStatus = 'Active'
+                ORDER BY r.Building, r.RoomNumber
             """)
             return cursor.fetchall()
 
@@ -459,6 +578,7 @@ class main(tk.Tk):
         self.db.create_rooms_table()
         self.db.create_table_cleaning_staff()
         self.db.create_cleaning_schedule_table()
+        self.db.create_room_assignments_table()
         self.db.migrate_students_table()
         self.db.update_expired_room_statuses()
         
@@ -799,21 +919,13 @@ class main(tk.Tk):
                     self.db.update_student(original_no, no, last, first, mi, Program, Status, Contact)
 
                     if old_status == "Active" and Status == "Inactive" and old_values[4] and old_values[5]:
-                        self.db.remove_student_from_room(original_no)
+                        self.db.remove_student_from_room(no)
                         self.db.get_all_rooms(self.rooms_tree)
-                        new_building, new_room = "", ""
-                    else:
-                        new_building, new_room = old_values[4], old_values[5]
 
-                    self.tree.item(edit_item, values=(
-                        no, FullName, Program, Contact,
-                        new_building, new_room, Status
-                    ))
-
-                else:  
+                else:
                     self.db.add_student(no, last, first, mi, Program, Status, Contact)
-                    self.tree.insert("", "end", values=(no, FullName, Program, Contact, "", "", Status))
 
+                self.db.get_all_students(self.tree)
                 update_count()
                 self.refresh_dashboard()
                 win.destroy()
@@ -929,6 +1041,7 @@ class main(tk.Tk):
                 if not buildingVar.get() or not roomVar.get():
                     return
                 self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get(), startDateEntry.get(), endDateEntry.get())
+                self.db.set_student_status(values[0], statusVar2.get())
                 self.db.update_expired_room_statuses()
                 self.db.get_all_rooms(self.rooms_tree)
                 self.db.get_all_students(self.tree)
@@ -1007,10 +1120,17 @@ class main(tk.Tk):
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
-                    SELECT StudentNo,
-                        TRIM(FirstName || ' ' || COALESCE(MiddleInitial || '. ', '') || LastName),
-                        Program, Contact, Building, Room, Status
-                    FROM Students WHERE LOWER(StudentNo) LIKE ? OR LOWER(FirstName || ' ' || LastName) LIKE ?
+                    SELECT s.StudentNo,
+                        TRIM(s.FirstName || ' ' || COALESCE(s.MiddleInitial || '. ', '') || s.LastName),
+                        s.Program, s.Contact,
+                        COALESCE(r.Building, ''), COALESCE(r.RoomNumber, ''),
+                        s.Status,
+                        COALESCE(ra.StartDate, ''), COALESCE(ra.EndDate, '')
+                    FROM Students s
+                    LEFT JOIN RoomAssignments ra
+                        ON ra.StudentNo = s.StudentNo AND ra.AssignmentStatus = 'Active'
+                    LEFT JOIN Rooms r ON r.RoomID = ra.RoomID
+                    WHERE LOWER(s.StudentNo) LIKE ? OR LOWER(s.FirstName || ' ' || s.LastName) LIKE ?
                 """, (f"%{q}%", f"%{q}%"))
                 for r in cur.fetchall(): self.tree.insert("", "end", values=r)
             update_count()
