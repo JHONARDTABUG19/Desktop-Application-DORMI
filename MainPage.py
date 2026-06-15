@@ -375,6 +375,8 @@ class Database:
 
     def delete_room(self, RoomID):
         with sqlite3.connect(DB_NAME) as con:
+            con.execute("DELETE FROM cleaning_schedule WHERE RoomID=?", (RoomID,))
+            con.execute("DELETE FROM Rooms WHERE RoomID=?", (RoomID,))
             con.execute("DELETE FROM Rooms WHERE RoomID=?", (RoomID,))
             con.commit()
 
