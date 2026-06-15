@@ -6,7 +6,7 @@ A local desktop application for managing dorm students, rooms, and cleaning staf
 
 ## Requirements
 
-- Python 3.x
+- Python 3.10 or higher
 - Required libraries:
   ```bash
   pip install pillow
@@ -21,21 +21,21 @@ A local desktop application for managing dorm students, rooms, and cleaning staf
 2. Make sure the following files are in the same folder:
    ```
    your_project/
-   ├── zLoginPage_in_class.py
-   ├── zDesktop_in_class.py
+   ├── LoginPage.py
+   ├── MainPage.py
    ├── dormyz.png
-   └── dorm_management.db        ← auto-created on first run
+   └── dorm_management.db        <- auto-created on first run
    ```
 3. Run the login page:
    ```bash
-   python zLoginPage_in_class.py
+   python LoginPage.py
    ```
 
 ---
 
 ## Building as a Standalone Desktop App (.exe)
 
-No Python or VSCode needed on the target machine after this.
+No Python or VS Code needed on the target machine after this.
 
 **Step 1** — Install PyInstaller:
 ```bash
@@ -44,22 +44,22 @@ pip install pyinstaller
 
 **Step 2** — Navigate to your project folder in the terminal and run:
 ```bash
-python -m PyInstaller --onefile --windowed --add-data "dormyz.png;." zLoginPage_in_class.py
+python -m PyInstaller --onefile --windowed --add-data "dormyz.png;." LoginPage.py
 ```
 
 **Step 3** — After the build finishes, go to the `dist` folder:
 ```
 your_project/
 ├── dist/
-│   └── zLoginPage_in_class.exe    ← your standalone app
-├── build/                         ← ignore
-├── zLoginPage_in_class.spec       ← ignore
-├── zLoginPage_in_class.py
-├── zDesktop_in_class.py
+│   └── LoginPage.exe    <- your standalone app
+├── build/               <- ignore
+├── LoginPage.spec       <- ignore
+├── LoginPage.py
+├── MainPage.py
 └── dormyz.png
 ```
 
-**Step 4** — Double-click `zLoginPage_in_class.exe` inside `dist/` to launch the app.
+**Step 4** — Double-click `LoginPage.exe` inside `dist/` to launch the app.
 
 > The `dorm_management.db` database file will be **automatically created** in the same folder as the `.exe` on first run. All your data is stored there.
 
