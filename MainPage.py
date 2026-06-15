@@ -253,12 +253,16 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
 
-            cur.execute("SELECT RoomID FROM Rooms WHERE Building=? AND RoomNumber=?", (Building, Room))
+            cur.execute("SELECT RoomID, Occupants, Capacity FROM Rooms WHERE Building=? AND RoomNumber=?", (Building, Room))
             room_row = cur.fetchone()
             if not room_row:
                 con.commit()
                 return
-            new_room_id = room_row[0]
+            new_room_id, occupants, capacity = room_row
+            
+            if occupants >= capacity:
+                con.commit()
+                return
 
             # end any current active assignment for this student (frees their old room)
             cur.execute("""
@@ -1451,7 +1455,7 @@ class main(tk.Tk):
             win.grab_set()
 
             upperFrame = tk.Frame(win, bg=content_color)
-            upperFrame.pack(fill="x", padx=15, pady=9)
+            upperFrame.pack(fill="x", padx=15, pady=(9,5))
             tk.Label(upperFrame, text="Edit Room" if edit_item else "Add Room",
                      bg=content_color, fg=FG_DARK, font=("Segoe UI", 15, "bold")).pack(side="left")
 
