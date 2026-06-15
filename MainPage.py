@@ -832,7 +832,7 @@ class main(tk.Tk):
         style.theme_use("clam")
         style.configure("Dashboard.Treeview",
                         background=WHITE,
-                        foreground=FG_DARK,
+                        foreground="#000000",
                         rowheight=36,
                         fieldbackground=WHITE,
                         borderwidth=0,
@@ -845,7 +845,7 @@ class main(tk.Tk):
                         padding=(8, 6))
         style.map("Dashboard.Treeview",
                 background=[("selected", ROW_SEL)],
-                foreground=[("selected", FG_DARK)])
+                foreground=[("selected", "#000000")])
         style.layout("Dashboard.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
         
@@ -1225,11 +1225,11 @@ class main(tk.Tk):
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Students.Treeview", background=WHITE, foreground=FG_DARK,
+        style.configure("Students.Treeview", background=WHITE, foreground="#000000",
                         rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
         style.configure("Students.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
-        style.map("Students.Treeview", background=[("selected", ROW_SEL)], foreground=[("selected", FG_DARK)])
+        style.map("Students.Treeview", background=[("selected", ROW_SEL)], foreground=[("selected", "#000000")])
         style.layout("Students.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
         tree_frame = tk.Frame(card, bg=WHITE)
@@ -1351,10 +1351,10 @@ class main(tk.Tk):
 
         def on_rfi(e):
             if rsearch.get() == "Search by Room No. or Building...":
-                rsearch.delete(0, "end"); rsearch.config(fg=FG_DARK)
+                rsearch.delete(0, "end"); rsearch.config(fg="#000000")
         def on_rfo(e):
             if not rsearch.get().strip():
-                rsearch.insert(0, "Search by Room No. or Building..."); rsearch.config(fg=FG_MUTED)
+                rsearch.insert(0, "Search by Room No. or Building..."); rsearch.config(fg="#000000")
         rsearch.bind("<FocusIn>",  on_rfi)
         rsearch.bind("<FocusOut>", on_rfo)
 
@@ -1409,11 +1409,11 @@ class main(tk.Tk):
                       command=lambda s=sv: filter_by_status(s)).pack(side="left", padx=3)
 
         style = ttk.Style()
-        style.configure("Rooms.Treeview", background=WHITE, foreground=FG_DARK,
+        style.configure("Rooms.Treeview", background=WHITE, foreground="#000000",
                         rowheight=36, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
         style.configure("Rooms.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                         font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
-        style.map("Rooms.Treeview", background=[("selected", ROW_SEL)], foreground=[("selected", FG_DARK)])
+        style.map("Rooms.Treeview", background=[("selected", ROW_SEL)], foreground=[("selected", "#000000")])
         style.layout("Rooms.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
         tree_frame = tk.Frame(card, bg=WHITE)
@@ -2052,7 +2052,7 @@ class main(tk.Tk):
         # ── Page top bar ──────────────────────────────────────────────
         topbar = tk.Frame(page, bg=content_color)
         topbar.pack(fill="x", padx=28, pady=(20, 8))
-        tk.Label(topbar, text="Cleaning Staff", bg=content_color, fg=FG_DARK,
+        tk.Label(topbar, text="Cleaning Staff", bg=content_color, fg="#000000",
                  font=("Segoe UI", 17, "bold")).pack(side="left")
         tk.Button(topbar, text="+ Add Staff", command=lambda: open_staff_window(),
                   bg=GREEN_BTN, fg=WHITE, font=BOLD_BTN_FONT, relief="solid", bd=0,
@@ -2119,13 +2119,13 @@ class main(tk.Tk):
         style = ttk.Style()
         style.theme_use("clam")
         for sname in ("CS.Master", "CS.Detail"):
-            style.configure(f"{sname}.Treeview", background=WHITE, foreground=FG_DARK,
+            style.configure(f"{sname}.Treeview", background=WHITE, foreground="#000000",
                             rowheight=34, fieldbackground=WHITE, borderwidth=0, font=UNIFORM_FONT)
             style.configure(f"{sname}.Treeview.Heading", background=HEADER_BG, foreground="#000000",
                             font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
             style.map(f"{sname}.Treeview",
                       background=[("selected", ROW_SEL)],
-                      foreground=[("selected", FG_DARK)])
+                      foreground=[("selected", "#000000")])
             style.layout(f"{sname}.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
         master_tf = tk.Frame(master_card, bg=WHITE)
