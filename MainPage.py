@@ -1193,18 +1193,40 @@ class main(tk.Tk):
             n = len(self.tree.get_children())
             self.count_label.config(text=f"{n} student{'s' if n != 1 else ''}")
 
+        def move_out_student():
+            selected = self.tree.selection()
+            if not selected:
+                messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
+                return
+            values = self.tree.item(selected[0], "values")
+            StudentNo = values[0]
+            Name = values[1]
+            # Check if student has an active room assignment
+            if not values[4] and not values[5]:
+                messagebox.showinfo("No Room Assigned", f"{Name} is not currently assigned to any room.")
+                return
+            if messagebox_confirm(f"Move out {Name} from their current room? This will clear their room assignment."):
+                self.db.remove_student_from_room(StudentNo)
+                self.db.get_all_students(self.tree)
+                self.db.get_all_rooms(self.rooms_tree)
+                self.refresh_dashboard()
+
         btn_cfg = dict(bg=BLUE, fg=WHITE, font=BOLD_BTN_FONT,
                        relief="solid", bd=0, padx=14, pady=5, cursor="hand2")
         tk.Button(action_bar, text="✏  Edit",        command=edit_student,  **btn_cfg).pack(side="right", padx=4)
         tk.Button(action_bar, text="⊞  Assign Room", command=assign_room,
                   bg=GREEN_BTN, fg=WHITE, font=BOLD_BTN_FONT,
                        relief="solid", bd=0, padx=14, pady=5, cursor="hand2").pack(side="right", padx=4)
+        tk.Button(action_bar, text="🚪  Move Out",
+                  bg="#e67e22", fg=WHITE, font=BOLD_BTN_FONT,
+                  relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
+                  command=move_out_student).pack(side="right", padx=4)
         tk.Button(action_bar, text="🗑  Delete",
                   bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
                   relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
                   command=delete_student).pack(side="right", padx=4)
 
-        tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, or deleting.",
+        tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, moving out, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
         self.db.update_expired_room_statuses()
