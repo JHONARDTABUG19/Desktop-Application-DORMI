@@ -70,6 +70,7 @@ your_project/
 - The app is intended for **single admin use** on one machine.
 - The `.db` file holds all your data — back it up regularly by copying it somewhere safe.
 - If you move the `.exe` to another folder or PC, the database starts fresh. To carry your data over, move the `.db` file alongside the `.exe`.
+- - If you move the `.exe` to another folder or PC, copy the `dorm_management.db` file and paste it in the same folder as the `.exe` on the new machine. Your data will be retained.
 
 ---
 
@@ -81,3 +82,4 @@ your_project/
 | App crashes on launch | Rebuild without `--windowed` to see the error in terminal |
 | Image not found error | Make sure `dormyz.png` is in the project folder before building |
 | `pip install` warning about PATH | Use `python -m pip install` instead of `pip install` |
+| Data is gone after moving to another PC | Copy `dorm_management.db` from the old machine's `dist/` folder and paste it next to the `.exe` on the new PC |
