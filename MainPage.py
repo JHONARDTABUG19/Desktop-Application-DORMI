@@ -1033,6 +1033,173 @@ class main(tk.Tk):
                 return
             add_student_window(prefill=self.tree.item(selected[0], "values"), edit_item=selected[0])
 
+        def generate_receipt():
+            selected = self.tree.selection()
+            if not selected:
+                messagebox.showwarning("Selection Required", "Please click a student record from the table first.")
+                return
+            values = self.tree.item(selected[0], "values")
+            StudentNo = values[0]
+            Name      = values[1]
+            Program   = values[2]
+            Building  = values[4]
+            Room      = values[5]
+            StartDate = values[7]
+            EndDate   = values[8]
+
+            if not Building or not Room:
+                messagebox.showinfo("No Room Assigned", f"{Name} is not currently assigned to any room.")
+                return
+
+            # Fetch price from DB
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                cur.execute("SELECT Price FROM Rooms WHERE Building=? AND RoomNumber=?", (Building, Room))
+                row = cur.fetchone()
+                price = row[0] if row else 0
+
+            # Calculate total if dates are available
+            total = price
+            months_covered = 1
+            try:
+                if StartDate and EndDate:
+                    d1 = datetime.strptime(StartDate, "%Y-%m-%d")
+                    d2 = datetime.strptime(EndDate,   "%Y-%m-%d")
+                    days = (d2 - d1).days
+                    months_covered = max(1, round(days / 30))
+                    total = price * months_covered
+            except ValueError:
+                pass
+
+            receipt_no = f"RCP-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            issued_on  = datetime.now().strftime("%B %d, %Y  %I:%M %p")
+
+# ── Receipt window ─────────────────────────────────────────────
+            win = tk.Toplevel()
+            win.title("Receipt")
+            win.config(bg=WHITE)
+            win.geometry("420x680")
+            win.resizable(False, False)
+            win.grab_set()
+
+            # ── Header band ────────────────────────────────────────────────
+            header = tk.Frame(win, bg=sidebar_color, height=80)
+            header.pack(fill="x")
+            header.pack_propagate(False)
+            tk.Label(header, text="Dormi", bg=sidebar_color, fg=WHITE,
+                     font=("Segoe UI", 20, "bold")).pack(anchor="w", padx=20, pady=(14, 0))
+            tk.Label(header, text="Official Room Assignment Receipt", bg=sidebar_color, fg=HEADER_BG,
+                     font=("Segoe UI", 9)).pack(anchor="w", padx=22)
+
+            # ── Receipt number + date row ──────────────────────────────────
+            meta = tk.Frame(win, bg=HEADER_BG)
+            meta.pack(fill="x")
+            tk.Label(meta, text=f"Receipt No.  {receipt_no}", bg=HEADER_BG, fg=FG_DARK,
+                     font=("Segoe UI", 8, "bold"), anchor="w").pack(side="left", padx=16, pady=6)
+            tk.Label(meta, text=f"Issued: {issued_on}", bg=HEADER_BG, fg=FG_DARK,
+                     font=("Segoe UI", 8), anchor="e").pack(side="right", padx=16, pady=6)
+
+            # ── Body ───────────────────────────────────────────────────────
+            body = tk.Frame(win, bg=WHITE, padx=24, pady=16)
+            body.pack(fill="both", expand=True)
+
+            def section_label(text):
+                tk.Label(body, text=text.upper(), bg=WHITE, fg=BLACK,
+                         font=("Segoe UI", 7, "bold")).pack(anchor="w", pady=(12, 2))
+                tk.Frame(body, bg=HEADER_BG, height=1).pack(fill="x")
+
+            def info_row(label, value, bold=False):
+                row = tk.Frame(body, bg=WHITE)
+                row.pack(fill="x", pady=3)
+                tk.Label(row, text=label, bg=WHITE, fg=BLACK,
+                         font=("Segoe UI", 9), width=18, anchor="w").pack(side="left")
+                tk.Label(row, text=value, bg=WHITE, fg=BLACK,
+                         font=("Segoe UI", 9, "bold") if bold else ("Segoe UI", 9),
+                         anchor="w").pack(side="left")
+
+            section_label("Student Information")
+            info_row("Name",        Name)
+            info_row("Student No.", StudentNo)
+            info_row("Program",     Program)
+
+            section_label("Room Assignment")
+            info_row("Building",    Building)
+            info_row("Room",        Room)
+            info_row("Start Date",  StartDate or "—")
+            info_row("End Date",    EndDate   or "—")
+            info_row("Duration",    f"{months_covered} month{'s' if months_covered != 1 else ''}")
+
+            section_label("Payment Summary")
+            info_row("Monthly Rate",   f"₱{price:,.2f}")
+            info_row("Months Covered", str(months_covered))
+
+            # ── Total row ──────────────────────────────────────────────────
+            total_frame = tk.Frame(body, bg=HEADER_BG, padx=10, pady=8)
+            total_frame.pack(fill="x", pady=(10, 0))
+            tk.Label(total_frame, text="TOTAL AMOUNT DUE", bg=HEADER_BG, fg=FG_DARK,
+                     font=("Segoe UI", 10, "bold")).pack(side="left")
+            tk.Label(total_frame, text=f"₱{total:,.2f}", bg=HEADER_BG, fg=FG_DARK,
+                     font=("Segoe UI", 13, "bold")).pack(side="right")
+
+            # ── Footer ─────────────────────────────────────────────────────
+            tk.Label(body, text="This is a system-generated receipt.", bg=WHITE,
+                     fg=BLACK, font=("Segoe UI", 7), anchor="center").pack(pady=(16, 0))
+            tk.Label(body, text="Thank you for staying with Dormi!", bg=WHITE,
+                     fg=BLACK, font=("Segoe UI", 8, "italic"), anchor="center").pack()
+
+            # ── Buttons ────────────────────────────────────────────────────
+            btn_bar = tk.Frame(win, bg=WHITE)
+            btn_bar.pack(fill="x", padx=20, pady=(0, 16))
+
+            def print_receipt():
+                try:
+                    import subprocess, tempfile
+                    lines = [
+                        "=" * 48,
+                        "                  DORMI",
+                        "       Official Room Assignment Receipt",
+                        "=" * 48,
+                        f"Receipt No. : {receipt_no}",
+                        f"Issued      : {issued_on}",
+                        "-" * 48,
+                        "STUDENT INFORMATION",
+                        f"  Name       : {Name}",
+                        f"  Student No.: {StudentNo}",
+                        f"  Program    : {Program}",
+                        "-" * 48,
+                        "ROOM ASSIGNMENT",
+                        f"  Building   : {Building}",
+                        f"  Room       : {Room}",
+                        f"  Start Date : {StartDate or '—'}",
+                        f"  End Date   : {EndDate or '—'}",
+                        f"  Duration   : {months_covered} month{'s' if months_covered != 1 else ''}",
+                        "-" * 48,
+                        "PAYMENT SUMMARY",
+                        f"  Monthly Rate   : P{price:,.2f}",
+                        f"  Months Covered : {months_covered}",
+                        "=" * 48,
+                        f"  TOTAL AMOUNT DUE : P{total:,.2f}",
+                        "=" * 48,
+                        "",
+                        "  This is a system-generated receipt.",
+                        "  Thank you for staying with Dormi!",
+                    ]
+                    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt",
+                                                     delete=False, encoding="utf-8")
+                    tmp.write("\n".join(lines))
+                    tmp.close()
+                    subprocess.Popen(["notepad.exe", tmp.name])
+                    win.destroy()
+                except Exception as e:
+                    messagebox.showerror("Print Error", str(e))
+
+            tk.Button(btn_bar, text="🖨  Print", font=BOLD_BTN_FONT,
+                      bg=BLUE, fg=WHITE, relief="flat", padx=14, pady=5,
+                      cursor="hand2", command=print_receipt).pack(side="left")
+            tk.Button(btn_bar, text="Close", font=BOLD_BTN_FONT,
+                      bg=RED_BTN, fg=WHITE, relief="flat", padx=14, pady=5,
+                      cursor="hand2", command=win.destroy).pack(side="right")
+
         def assign_room():
             selected = self.tree.selection()
             if not selected:
@@ -1389,6 +1556,10 @@ class main(tk.Tk):
                   bg=RED_BTN, fg=WHITE, font=BOLD_BTN_FONT,
                   relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
                   command=delete_student).pack(side="right", padx=4)
+        tk.Button(action_bar, text="🧾  Receipt",
+                bg=FG_DARK, fg=WHITE, font=BOLD_BTN_FONT,
+                relief="solid", bd=0, padx=14, pady=5, cursor="hand2",
+                command=generate_receipt).pack(side="right", padx=4)
 
         tk.Label(card, text="ⓘ  Click a row to select before editing, assigning, moving out, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=20, pady=(0, 10))
