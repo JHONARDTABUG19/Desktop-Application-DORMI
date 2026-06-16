@@ -36,7 +36,7 @@ def create_table_for_login():
     cur = con.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS Admin (
-            ID       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+            AdminID       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
             Username VARCHAR(255) NOT NULL UNIQUE,
             Password VARCHAR(255) NOT NULL
         )
