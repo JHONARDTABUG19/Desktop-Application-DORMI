@@ -35,13 +35,13 @@ def create_table_for_login():
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS Admin (
+        CREATE TABLE IF NOT EXISTS ADMIN (
             AdminID       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
             Username VARCHAR(255) NOT NULL UNIQUE,
             Password VARCHAR(255) NOT NULL
         )
     """)
-    cur.execute("INSERT OR IGNORE INTO Admin (Username, Password) VALUES (?,?)",
+    cur.execute("INSERT OR IGNORE INTO ADMIN (Username, Password) VALUES (?,?)",
                 ("admin", "admin123"))
     con.commit()
     con.close()
@@ -50,7 +50,7 @@ def create_table_for_login():
 def check_credentials(Username, Password):
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
-    cur.execute("SELECT * FROM Admin WHERE Username=? AND Password=?", (Username, Password))
+    cur.execute("SELECT * FROM ADMIN WHERE Username=? AND Password=?", (Username, Password))
     result = cur.fetchone()
     con.close()
     return result is not None
