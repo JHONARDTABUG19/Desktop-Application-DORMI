@@ -447,7 +447,7 @@ class Database:
             cur = con.cursor()
             cur.execute("""
                         SELECT cs.StaffID, cs.LastName || ', ' || cs.FirstName, cs.Contact, cs.Email,
-                            COUNT(sch.Id) AS assignments
+                            COUNT(sch.CleaningSchedID) AS assignments
                         FROM CleaningStaff cs
                         LEFT JOIN CleaningSchedule sch 
                             ON cs.StaffID = sch.StaffID
@@ -469,7 +469,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             con.execute("""
                 CREATE TABLE IF NOT EXISTS CleaningSchedule (
-                    Id        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+                    CleaningSchedID        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     StaffID   VARCHAR(255) NOT NULL,
                     RoomID    INTEGER NOT NULL,
                     Month     VARCHAR(255) NOT NULL,
@@ -499,14 +499,14 @@ class Database:
 
             # Carry existing text-based rows over to RoomID references
             cur.execute("""
-                SELECT Id, StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd
+                SELECT CleaningSchedID, StaffID, Building, Room, Month, Day, Year, TimeStart, TimeEnd
                 FROM CleaningSchedule
             """)
             old_rows = cur.fetchall()
 
             cur.execute("""
                 CREATE TABLE cleaning_schedule_new (
-                    Id        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+                    CleaningSchedID        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
                     StaffID   VARCHAR(255) NOT NULL,
                     RoomID    INTEGER NOT NULL,
                     Month     VARCHAR(255) NOT NULL,
@@ -544,7 +544,7 @@ class Database:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
             cur.execute("""
-                SELECT sch.Id, r.Building, r.RoomNumber,
+                SELECT sch.CleaningSchedID, r.Building, r.RoomNumber,
                        sch.Month || '/' || sch.Day || '/' || sch.Year,
                        sch.TimeStart, sch.TimeEnd
                 FROM CleaningSchedule sch
@@ -576,7 +576,7 @@ class Database:
 
     def delete_schedule(self, sched_id):
         with sqlite3.connect(DB_NAME) as con:
-            con.execute("DELETE FROM CleaningSchedule WHERE Id=?", (sched_id,))
+            con.execute("DELETE FROM CleaningSchedule WHERE CleaningSchedID=?", (sched_id,))
             con.commit()
 
     #============================================================
@@ -1188,7 +1188,7 @@ class main(tk.Tk):
 
         def do_search():
             q = search_entry.get().strip().lower()
-            if q == "search by Id or name...": q = ""
+            if q == "search by ID or name...": q = ""
             for r in self.tree.get_children(): self.tree.delete(r)
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
@@ -2086,13 +2086,13 @@ class main(tk.Tk):
 
         def do_cs_search():
             q = cs_search.get().strip().lower()
-            if q == "search by Id or name...": q = ""
+            if q == "search by ID or name...": q = ""
             for r in self.cleaning_tree.get_children(): self.cleaning_tree.delete(r)
             with sqlite3.connect(DB_NAME) as con:
                 cur = con.cursor()
                 cur.execute("""
                     SELECT cs.StaffID, cs.FirstName || ' ' || cs.LastName AS FullName, cs.Contact, cs.Email,
-                           COUNT(sch.Id)
+                           COUNT(sch.CleaningSchedID)
                     FROM CleaningStaff cs
                     LEFT JOIN CleaningSchedule sch ON cs.StaffID = sch.StaffID
                     WHERE LOWER(cs.StaffID) LIKE ? OR LOWER(cs.FirstName || ' ' || cs.LastName) LIKE ?
