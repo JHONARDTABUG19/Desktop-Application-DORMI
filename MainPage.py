@@ -930,7 +930,7 @@ class main(tk.Tk):
 
             statusVar = tk.StringVar()
             statusDrop = ttk.Combobox(midFrame, textvariable=statusVar,
-                                      values=["Active", "Inactive"],
+                                      values=["Active", "Inactive", "Away"],
                                       state="readonly", font=UNIFORM_FONT)
             statusDrop.grid(row=5, column=1, columnspan=2, sticky="we", padx=(6, 0), pady=(0, 10))
             statusDrop.current(0)
@@ -1113,6 +1113,23 @@ class main(tk.Tk):
             def save_room():
                 if not buildingVar.get() or not roomVar.get():
                     return
+
+                # Check if room is already full before attempting assignment
+                with sqlite3.connect(DB_NAME) as con:
+                    cur = con.cursor()
+                    cur.execute(
+                        "SELECT Occupants, Capacity FROM Rooms WHERE Building=? AND RoomNumber=?",
+                        (buildingVar.get(), roomVar.get())
+                    )
+                    row = cur.fetchone()
+                    if row and row[0] >= row[1]:
+                        messagebox.showerror(
+                            "Room Full",
+                            f"Room {roomVar.get()} in {buildingVar.get()} is already at full capacity "
+                            f"({row[0]}/{row[1]}). Please select a different room."
+                        )
+                        return
+
                 self.db.assign_room_to_student(values[0], roomVar.get(), buildingVar.get(), startDateEntry.get(), endDateEntry.get())
                 self.db.set_student_status(values[0], statusVar2.get())
                 self.db.update_expired_room_statuses()
@@ -1187,6 +1204,8 @@ class main(tk.Tk):
         search_entry.bind("<FocusOut>", on_fo)
 
         def do_search():
+            apply_sort()
+
             q = search_entry.get().strip().lower()
             if q == "search by Id or name...": q = ""
             for r in self.tree.get_children(): self.tree.delete(r)
@@ -1212,8 +1231,7 @@ class main(tk.Tk):
             search_entry.delete(0, "end")
             search_entry.insert(0, "Search by ID or Name...")
             search_entry.config(fg=FG_MUTED)
-            self.db.get_all_students(self.tree)
-            update_count()
+            apply_sort()
 
         tk.Label(sw, text="✕", bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 9),
                  cursor="hand2").pack(side="right", padx=(2, 6))
@@ -1222,6 +1240,79 @@ class main(tk.Tk):
         tk.Button(filter_bar, text="Search", fg="BLACK", bg=content_color,
                   font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
                   cursor="hand2", command=do_search).pack(side="left", padx=(0, 16))
+
+        # ── Sort dropdown ──────────────────────────────────────────────────
+
+        sort_options = {
+            "Name (A–Z)":       "TRIM(s.FirstName || ' ' || s.LastName) ASC",
+            "Name (Z–A)":       "TRIM(s.FirstName || ' ' || s.LastName) DESC",
+            "Student No. (↑)":  "s.StudentNo ASC",
+            "Student No. (↓)":  "s.StudentNo DESC",
+            "Program (A–Z)":    "s.Program ASC",
+            "Building (A–Z)":   "COALESCE(r.Building, '') ASC",
+            "Room (A–Z)":       "COALESCE(r.RoomNumber, '') ASC",
+        }
+
+        # ── styled sort wrapper ────────────────────────────────────────────
+        sort_wrapper = tk.Frame(filter_bar, bg=HEADER_BG,
+                                highlightbackground=BORDER, highlightthickness=1)
+        sort_wrapper.pack(side="left", padx=(10, 0))
+
+        tk.Label(sort_wrapper, text="⇅  Sort by", bg=HEADER_BG, fg="#000000",
+                font=("Segoe UI", 9, "bold"), padx=8, pady=0).pack(side="left")
+
+        # thin divider between label and dropdown
+        tk.Frame(sort_wrapper, bg=BORDER, width=1).pack(side="left", fill="y", pady=4)
+
+        sort_style = ttk.Style()
+        sort_style.configure("Sort.TCombobox",
+                            fieldbackground=HEADER_BG,
+                            background=HEADER_BG,
+                            foreground="#000000",
+                            arrowcolor="#000000",
+                            borderwidth=0,
+                            relief="flat")
+        sort_style.map("Sort.TCombobox",
+                    fieldbackground=[("readonly", HEADER_BG)],
+                    background=[("readonly", HEADER_BG), ("active", "#000000")],
+                    foreground=[("readonly", "#000000")])
+
+        sortVar = tk.StringVar(value="Name (A–Z)")
+        sortDrop = ttk.Combobox(sort_wrapper, textvariable=sortVar,
+                                values=list(sort_options.keys()),
+                                state="readonly", font=("Segoe UI", 9),
+                                style="Sort.TCombobox", width=14)
+        sortDrop.pack(side="left", padx=(4, 6), pady=5)
+
+        def apply_sort(event=None):
+            order_clause = sort_options[sortVar.get()]
+            q = search_entry.get().strip().lower()
+            if q in ("search by id or name...", ""):
+                q = ""
+            for r in self.tree.get_children():
+                self.tree.delete(r)
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                cur.execute(f"""
+                    SELECT s.StudentNo,
+                        TRIM(s.FirstName || ' ' || COALESCE(s.MiddleInitial || '. ', '') || s.LastName),
+                        s.Program, s.Contact,
+                        COALESCE(r.Building, ''), COALESCE(r.RoomNumber, ''),
+                        s.Status,
+                        COALESCE(ra.StartDate, ''), COALESCE(ra.EndDate, '')
+                    FROM Students s
+                    LEFT JOIN RoomAssignments ra
+                        ON ra.StudentNo = s.StudentNo AND ra.AssignmentStatus = 'Active'
+                    LEFT JOIN Rooms r ON r.RoomID = ra.RoomID
+                    WHERE (? = '' OR LOWER(s.StudentNo) LIKE '%' || ? || '%'
+                                OR LOWER(s.FirstName || ' ' || s.LastName) LIKE '%' || ? || '%')
+                    ORDER BY {order_clause}
+                """, (q, q, q))
+                for r in cur.fetchall():
+                    self.tree.insert("", "end", values=r)
+            update_count()
+
+        sortDrop.bind("<<ComboboxSelected>>", apply_sort)   
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -1303,7 +1394,7 @@ class main(tk.Tk):
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
         self.db.update_expired_room_statuses()
-        self.db.get_all_students(self.tree)
+        apply_sort()
         update_count()
 
     # ── Rooms page ────────────────────────────────────────────────────
