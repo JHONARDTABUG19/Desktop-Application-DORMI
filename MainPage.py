@@ -716,7 +716,7 @@ class main(tk.Tk):
                                        anchor="w", padx=10, pady=8, cursor="hand2")
         self.studentButton.pack(fill="x", padx=10, pady=2)
 
-        self.roomsButton = tk.Button(self.sidebar, text="  ROOMS",
+        self.roomsButton = tk.Button(self.sidebar, text="  Rooms",
                                      bg=sidebar_color, fg=font_color_sidebar,
                                      font=("Arial", 10), relief="flat",
                                      anchor="w", padx=10, pady=8, cursor="hand2")
