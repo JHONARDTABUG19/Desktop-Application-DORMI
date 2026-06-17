@@ -200,7 +200,7 @@ def login_page():
     def toggle_pw():
         if show_var.get():
             password_entry.entry.config(show="")
-            toggle_btn.config(text="🙈  Hide")
+            toggle_btn.config(text="   Hide")
         else:
             password_entry.entry.config(show="•")
             toggle_btn.config(text="👁  Show")
