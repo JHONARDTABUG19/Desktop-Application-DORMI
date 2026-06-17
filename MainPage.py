@@ -1151,54 +1151,119 @@ class main(tk.Tk):
             btn_bar = tk.Frame(win, bg=WHITE)
             btn_bar.pack(fill="x", padx=20, pady=(0, 16))
 
-            def print_receipt():
+            def download_receipt():
                 try:
-                    import subprocess, tempfile
-                    lines = [
-                        "=" * 48,
-                        "                  DORMI",
-                        "       Official Room Assignment Receipt",
-                        "=" * 48,
-                        f"Receipt No. : {receipt_no}",
-                        f"Issued      : {issued_on}",
-                        "-" * 48,
-                        "STUDENT INFORMATION",
-                        f"  Name       : {Name}",
-                        f"  Student No.: {StudentNo}",
-                        f"  Program    : {Program}",
-                        "-" * 48,
-                        "ROOM ASSIGNMENT",
-                        f"  Building   : {Building}",
-                        f"  Room       : {Room}",
-                        f"  Start Date : {StartDate or '—'}",
-                        f"  End Date   : {EndDate or '—'}",
-                        f"  Duration   : {months_covered} month{'s' if months_covered != 1 else ''}",
-                        "-" * 48,
-                        "PAYMENT SUMMARY",
-                        f"  Monthly Rate   : P{price:,.2f}",
-                        f"  Months Covered : {months_covered}",
-                        "=" * 48,
-                        f"  TOTAL AMOUNT DUE : P{total:,.2f}",
-                        "=" * 48,
-                        "",
-                        "  This is a system-generated receipt.",
-                        "  Thank you for staying with Dormi!",
-                    ]
-                    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt",
-                                                     delete=False, encoding="utf-8")
-                    tmp.write("\n".join(lines))
-                    tmp.close()
-                    subprocess.Popen(["notepad.exe", tmp.name])
-                    win.destroy()
-                except Exception as e:
-                    messagebox.showerror("Print Error", str(e))
+                    from tkinter import filedialog
+                    from reportlab.lib.pagesizes import A5
+                    from reportlab.lib import colors
+                    from reportlab.lib.units import mm
+                    from reportlab.pdfgen import canvas as pdf_canvas
 
-            tk.Button(btn_bar, text="🖨  Print", font=BOLD_BTN_FONT,
+                    file_path = filedialog.asksaveasfilename(
+                        defaultextension=".pdf",
+                        filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                        initialfile=f"Receipt_{receipt_no}.pdf",
+                        title="Save Receipt as PDF"
+                    )
+                    if not file_path:
+                        return
+
+                    W, H = A5  # 148 x 210 mm
+                    c = pdf_canvas.Canvas(file_path, pagesize=A5)
+                    margin = 15 * mm
+                    y = H - 15 * mm
+
+                    # ── Header ──────────────────────────────────────────────
+                    c.setFillColor(colors.HexColor("#1a3c5e"))
+                    c.rect(0, H - 28 * mm, W, 28 * mm, fill=1, stroke=0)
+                    c.setFillColor(colors.white)
+                    c.setFont("Helvetica-Bold", 18)
+                    c.drawCentredString(W / 2, H - 12 * mm, "DORMI")
+                    c.setFont("Helvetica", 9)
+                    c.drawCentredString(W / 2, H - 20 * mm, "Official Room Assignment Receipt")
+                    y = H - 35 * mm
+
+                    # ── Receipt No & Date ────────────────────────────────────
+                    c.setFillColor(colors.HexColor("#333333"))
+                    c.setFont("Helvetica", 8)
+                    c.drawString(margin, y, f"Receipt No: {receipt_no}")
+                    c.drawRightString(W - margin, y, f"Issued: {issued_on}")
+                    y -= 5 * mm
+                    c.setStrokeColor(colors.HexColor("#cccccc"))
+                    c.line(margin, y, W - margin, y)
+                    y -= 6 * mm
+
+                    # ── Section helper ───────────────────────────────────────
+                    def section(title):
+                        nonlocal y
+                        c.setFillColor(colors.HexColor("#1a3c5e"))
+                        c.setFont("Helvetica-Bold", 8)
+                        c.drawString(margin, y, title)
+                        y -= 5 * mm
+
+                    def row(label, value):
+                        nonlocal y
+                        c.setFillColor(colors.HexColor("#555555"))
+                        c.setFont("Helvetica", 8)
+                        c.drawString(margin + 3 * mm, y, label)
+                        c.setFillColor(colors.HexColor("#111111"))
+                        c.setFont("Helvetica-Bold", 8)
+                        c.drawRightString(W - margin, y, str(value))
+                        y -= 5 * mm
+
+                    # ── Student Info ─────────────────────────────────────────
+                    section("STUDENT INFORMATION")
+                    row("Name", Name)
+                    row("Student No.", StudentNo)
+                    row("Program", Program)
+                    y -= 2 * mm
+                    c.setStrokeColor(colors.HexColor("#eeeeee"))
+                    c.line(margin, y, W - margin, y)
+                    y -= 5 * mm
+
+                    # ── Room Assignment ──────────────────────────────────────
+                    section("ROOM ASSIGNMENT")
+                    row("Building", Building)
+                    row("Room", Room)
+                    row("Start Date", StartDate or "—")
+                    row("End Date", EndDate or "—")
+                    row("Duration", f"{months_covered} month{'s' if months_covered != 1 else ''}")
+                    y -= 2 * mm
+                    c.line(margin, y, W - margin, y)
+                    y -= 5 * mm
+
+                    # ── Payment Summary ──────────────────────────────────────
+                    section("PAYMENT SUMMARY")
+                    row("Monthly Rate", f"P{price:,.2f}")
+                    row("Months Covered", str(months_covered))
+                    y -= 2 * mm
+
+                    # ── Total box ────────────────────────────────────────────
+                    box_h = 12 * mm
+                    c.setFillColor(colors.HexColor("#1a3c5e"))
+                    c.rect(margin, y - box_h, W - 2 * margin, box_h, fill=1, stroke=0)
+                    c.setFillColor(colors.white)
+                    c.setFont("Helvetica-Bold", 10)
+                    c.drawString(margin + 4 * mm, y - 7.5 * mm, "TOTAL AMOUNT DUE")
+                    c.drawRightString(W - margin - 4 * mm, y - 7.5 * mm, f"P{total:,.2f}")
+                    y -= box_h + 6 * mm
+
+                    # ── Footer ───────────────────────────────────────────────
+                    c.setFillColor(colors.HexColor("#888888"))
+                    c.setFont("Helvetica-Oblique", 7)
+                    c.drawCentredString(W / 2, y, "This is a system-generated receipt.")
+                    c.drawCentredString(W / 2, y - 4 * mm, "Thank you for staying with Dormi!")
+
+                    c.save()
+                    messagebox.showinfo("Saved", f"Receipt saved to:\n{file_path}")
+                    win.destroy()
+
+                except Exception as e:
+                    messagebox.showerror("Save Error", str(e))
+
+            tk.Button(btn_bar, text="📄  Save as PDF", font=BOLD_BTN_FONT,
                       bg=BLUE, fg=WHITE, relief="flat", padx=14, pady=5,
-                      cursor="hand2", command=print_receipt).pack(side="left")
-            tk.Button(btn_bar, text="Close", font=BOLD_BTN_FONT,
-                      bg=RED_BTN, fg=WHITE, relief="flat", padx=14, pady=5,
-                      cursor="hand2", command=win.destroy).pack(side="right")
+                      cursor="hand2", command=download_receipt).pack(side="left")
 
         def assign_room():
             selected = self.tree.selection()
