@@ -1478,8 +1478,8 @@ class main(tk.Tk):
         sort_options = {
             "Name (A–Z)":       "TRIM(s.FirstName || ' ' || s.LastName) ASC",
             "Name (Z–A)":       "TRIM(s.FirstName || ' ' || s.LastName) DESC",
-            "Student No. (↑)":  "s.StudentNo ASC",
-            "Student No. (↓)":  "s.StudentNo DESC",
+            "Student No. (ASC)":  "s.StudentNo ASC",
+            "Student No. (DESC)":  "s.StudentNo DESC",
             "Program (A–Z)":    "s.Program ASC",
             "Building (A–Z)":   "COALESCE(r.Building, '') ASC",
             "Room (A–Z)":       "COALESCE(r.RoomNumber, '') ASC",
@@ -1702,7 +1702,7 @@ class main(tk.Tk):
             rsearch.delete(0, "end")
             rsearch.insert(0, "Search by Room No. or Building...")
             rsearch.config(fg=FG_MUTED)
-            self.db.get_all_rooms(self.rooms_tree)
+            apply_room_sort()
 
         tk.Label(sw, text="✕", bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 9),
                  cursor="hand2").pack(side="right", padx=(2, 6))
@@ -1711,6 +1711,62 @@ class main(tk.Tk):
         tk.Button(filter_bar, text="Search", fg="BLACK", bg=content_color,
                   font=UNIFORM_FONT, relief="flat", padx=14, pady=6,
                   cursor="hand2", command=do_rsearch).pack(side="left", padx=(0, 16))
+        
+        # ── Sort dropdown ──────────────────────────────────────────────────
+        room_sort_options = {
+            "Building (A–Z)":   "Building ASC",
+            "Building (Z–A)":   "Building DESC",
+            "Capacity (ASC)":     "Capacity ASC",
+            "Capacity (DESC)":     "Capacity DESC",
+            "Room No. (ASC)":     "RoomNumber ASC",
+            "Room No. (DESC)":     "RoomNumber DESC",
+        }
+
+        room_sort_wrapper = tk.Frame(filter_bar, bg=HEADER_BG,
+                                     highlightbackground=BORDER, highlightthickness=1)
+        room_sort_wrapper.pack(side="left", padx=(10, 0))
+
+        tk.Label(room_sort_wrapper, text="⇅  Sort by", bg=HEADER_BG, fg="#000000",
+                 font=("Segoe UI", 9, "bold"), padx=8).pack(side="left")
+        tk.Frame(room_sort_wrapper, bg=BORDER, width=1).pack(side="left", fill="y", pady=4)
+
+        room_sort_style = ttk.Style()
+        room_sort_style.configure("RoomSort.TCombobox",
+                                  fieldbackground=HEADER_BG, background=HEADER_BG,
+                                  foreground="#000000", arrowcolor="#000000",
+                                  borderwidth=0, relief="flat")
+        room_sort_style.map("RoomSort.TCombobox",
+                            fieldbackground=[("readonly", HEADER_BG)],
+                            background=[("readonly", HEADER_BG)],
+                            foreground=[("readonly", "#000000")])
+
+        roomSortVar = tk.StringVar(value="Building (A–Z)")
+        roomSortDrop = ttk.Combobox(room_sort_wrapper, textvariable=roomSortVar,
+                                    values=list(room_sort_options.keys()),
+                                    state="readonly", font=("Segoe UI", 9),
+                                    style="RoomSort.TCombobox", width=14)
+        roomSortDrop.pack(side="left", padx=(4, 6), pady=5)
+
+        def apply_room_sort(event=None):
+            order_clause = room_sort_options[roomSortVar.get()]
+            q = rsearch.get().strip().lower()
+            if q in ("search by room no. or building...", ""):
+                q = ""
+            for r in self.rooms_tree.get_children():
+                self.rooms_tree.delete(r)
+            with sqlite3.connect(DB_NAME) as con:
+                cur = con.cursor()
+                cur.execute(f"""
+                    SELECT RoomID, RoomNumber, Building, Capacity, Occupants, Status, Price
+                    FROM Rooms
+                    WHERE (? = '' OR LOWER(RoomNumber) LIKE '%' || ? || '%'
+                                  OR LOWER(Building) LIKE '%' || ? || '%')
+                    ORDER BY {order_clause}
+                """, (q, q, q))
+                for r in cur.fetchall():
+                    self.rooms_tree.insert("", "end", values=r[1:], tags=(r[0],))
+
+        roomSortDrop.bind("<<ComboboxSelected>>", apply_room_sort)
 
         filter_frame = tk.Frame(card, bg=WHITE)
         filter_frame.pack(fill="x", padx=16, pady=(0, 8))
@@ -1948,7 +2004,7 @@ class main(tk.Tk):
         tk.Label(card, text="ⓘ  Click a row to select before editing, viewing details, or deleting.",
                  bg=WHITE, fg=FG_MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=20, pady=(0, 10))
 
-        self.db.get_all_rooms(self.rooms_tree)
+        apply_room_sort()
         update_room_count()
 
     # ══════════════════════════════════════════════════════════════════
