@@ -1978,7 +1978,7 @@ class main(tk.Tk):
                 try:
                     parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
                 except ValueError:
-                    err_lbl.config(text="Date must be in YYYY-MM-DD format."); return
+                    err_lbl.config(text="Invalid date! Use YYYY-MM-DD format with valid calendar numbers."); return
 
                 if parsed_date.year < 2026:
                     err_lbl.config(text="Year must be 2026 or later."); return
