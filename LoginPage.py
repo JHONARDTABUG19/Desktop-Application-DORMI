@@ -35,22 +35,22 @@ def create_table_for_login():
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS Admin (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            username VARCHAR(255) NOT NULL UNIQUE,
-            password VARCHAR(255) NOT NULL
+        CREATE TABLE IF NOT EXISTS ADMIN (
+            AdminID       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+            Username VARCHAR(255) NOT NULL UNIQUE,
+            Password VARCHAR(255) NOT NULL
         )
     """)
-    cur.execute("INSERT OR IGNORE INTO Admin (username, password) VALUES (?,?)",
+    cur.execute("INSERT OR IGNORE INTO ADMIN (Username, Password) VALUES (?,?)",
                 ("admin", "admin123"))
     con.commit()
     con.close()
 
 
-def check_credentials(username, password):
+def check_credentials(Username, Password):
     con = sqlite3.connect(DB_NAME)
     cur = con.cursor()
-    cur.execute("SELECT * FROM Admin WHERE username=? AND password=?", (username, password))
+    cur.execute("SELECT * FROM ADMIN WHERE Username=? AND Password=?", (Username, Password))
     result = cur.fetchone()
     con.close()
     return result is not None
@@ -186,21 +186,21 @@ def login_page():
     # Username
     tk.Label(form, text="USERNAME", font=("Segoe UI", 8, "bold"),
              bg=PANEL, fg=MUTED).pack(anchor="w", pady=(0, 4))
-    username_entry = StyledEntry(form, placeholder="Enter your username")
+    username_entry = StyledEntry(form, placeholder="Enter your Username")
     username_entry.pack(fill="x", pady=(0, 16))
 
     # Password
     tk.Label(form, text="PASSWORD", font=("Segoe UI", 8, "bold"),
              bg=PANEL, fg=MUTED).pack(anchor="w", pady=(0, 4))
-    password_entry = StyledEntry(form, placeholder="Enter your password", show="•")
+    password_entry = StyledEntry(form, placeholder="Enter your Password", show="•")
     password_entry.pack(fill="x", pady=(0, 6))
 
-    # Show/hide password toggle
+    # Show/hide Password toggle
     show_var = tk.BooleanVar(value=False)
     def toggle_pw():
         if show_var.get():
             password_entry.entry.config(show="")
-            toggle_btn.config(text="   Hide")
+            toggle_btn.config(text="🙈  Hide")
         else:
             password_entry.entry.config(show="•")
             toggle_btn.config(text="👁  Show")
@@ -240,29 +240,29 @@ def login_page():
 
     # ── Login logic ──
     def attempt_login(event=None):
-        username = username_entry.get().strip()
-        password = password_entry.get().strip()
+        Username = username_entry.get().strip()
+        Password = password_entry.get().strip()
 
-        if not username or not password:
-            err_label.config(text="Please enter both username and password.")
+        if not Username or not Password:
+            err_label.config(text="Please enter both Username and Password.")
             shake(form)
             return
 
-        if check_credentials(username, password):
+        if check_credentials(Username, Password):
             err_label.config(text="")
             root.destroy()
             from MainPage import main as MainApp
             app = MainApp()
             app.mainloop()
         else:
-            err_label.config(text="Incorrect username or password.")
+            err_label.config(text="Incorrect Username or Password.")
             password_entry.entry.delete(0, "end")
             shake(form)
 
     # Enter key triggers login
     root.bind("<Return>", attempt_login)
 
-    # ── Shake animation on wrong password
+    # ── Shake animation on wrong Password
     def shake(widget, times=6, distance=8):
         def _shake(count, direction):
             if count <= 0:
