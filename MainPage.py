@@ -2191,7 +2191,7 @@ class main(tk.Tk):
                 try:
                     if edit_item:
                         self.db.update_cleaning_staff(id_val, last_val, first_val, mi_val,
-                                                      email_val, contact_val, fullname_val)
+                                                      email_val, contact_val)
                         # refresh name if this is the selected staff
                         if selected_cs_id.get() == id_val:
                             selected_cs_name.set(fullname_val)
